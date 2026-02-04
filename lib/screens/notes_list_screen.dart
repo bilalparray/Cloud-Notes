@@ -125,7 +125,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
       if (mounted && showUndo) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Note "$noteTitle" deleted'),
+            content: Text(
+              'Note "$noteTitle" deleted',
+              style: const TextStyle(color: Colors.black, fontSize: 16),
+            ),
             backgroundColor:
                 Theme.of(context).colorScheme.surfaceContainerHighest,
             behavior: SnackBarBehavior.floating,
