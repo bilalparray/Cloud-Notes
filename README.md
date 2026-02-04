@@ -9,14 +9,16 @@ A Flutter application for cloud-synced notes with Google authentication. Notes a
 - ☁️ Real-time synchronization across devices
 - 🌙 Dark mode support (follows system theme)
 - 🎨 Material Design 3 UI
+- 🌐 Web support (deploy to any static hosting)
+- 📱 Cross-platform (Android, iOS, Web)
 
 ## Prerequisites
 
-- Flutter SDK (3.0.0 or higher)
+- Flutter SDK (3.0.0 or higher) with web support enabled
 - Firebase project with:
   - Authentication enabled (Google Sign-In provider)
   - Firestore Database enabled
-  - iOS/Android apps configured
+  - iOS/Android/Web apps configured
 
 ## Firebase Setup
 

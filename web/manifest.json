@@ -1,0 +1,12 @@
+{
+    "name": "Cloud Notes",
+    "short_name": "Cloud Notes",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#6366F1",
+    "theme_color": "#6366F1",
+    "description": "Sync your notes across all devices",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": []
+}

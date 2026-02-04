@@ -46,3 +46,10 @@ app.*.map.json
 # Firebase
 **/google-services.json
 **/GoogleService-Info.plist
+web/firebase-config.js
+.env
+.env.local
+
+# Web
+/web/favicon.png
+/web/icons/

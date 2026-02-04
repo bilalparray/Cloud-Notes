@@ -1,13 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'config/firebase_config.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/notes_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  // Initialize Firebase with explicit configuration
+  if (kIsWeb) {
+    // Web Firebase configuration
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: FirebaseConfig.apiKey,
+        authDomain: FirebaseConfig.authDomain,
+        projectId: FirebaseConfig.projectId,
+        storageBucket: FirebaseConfig.storageBucket,
+        messagingSenderId: FirebaseConfig.messagingSenderId,
+        appId: FirebaseConfig.appId,
+        measurementId: FirebaseConfig.measurementId,
+      ),
+    );
+  } else {
+    // Mobile platforms use automatic configuration from google-services.json / GoogleService-Info.plist
+    await Firebase.initializeApp();
+  }
+
   runApp(const CloudNotesApp());
 }
 
