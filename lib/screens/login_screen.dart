@@ -60,14 +60,17 @@ class _LoginScreenState extends State<LoginScreen>
           SnackBar(
             content: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.error_outline,
-                  color: Colors.red.shade300,
+                  color: Color.fromARGB(255, 253, 2, 2),
                   size: 20,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('Sign in failed: ${e.toString()}'),
+                  child: Text(
+                    'Sign in failed: ${e.toString()}',
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  ),
                 ),
               ],
             ),
@@ -153,18 +156,20 @@ class _LoginScreenState extends State<LoginScreen>
                       const SizedBox(height: 32),
                       Text(
                         'Cloud Notes',
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.5,
+                                ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'Sync your notes across all devices',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              height: 1.5,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  height: 1.5,
+                                ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 48),
@@ -186,7 +191,9 @@ class _LoginScreenState extends State<LoginScreen>
                                 )
                               : const Icon(Icons.login_rounded),
                           label: Text(
-                            _isLoading ? 'Signing in...' : 'Sign in with Google',
+                            _isLoading
+                                ? 'Signing in...'
+                                : 'Sign in with Google',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -212,9 +219,10 @@ class _LoginScreenState extends State<LoginScreen>
                           const SizedBox(width: 8),
                           Text(
                             'Secure cloud sync',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
                           ),
                         ],
                       ),

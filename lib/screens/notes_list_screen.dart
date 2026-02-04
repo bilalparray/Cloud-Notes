@@ -126,7 +126,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Note "$noteTitle" deleted'),
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -166,7 +167,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
               size: 20,
             ),
             const SizedBox(width: 12),
-            Text(message),
+            Text(
+              message,
+              style: const TextStyle(color: Colors.black, fontSize: 16),
+            ),
           ],
         ),
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -190,7 +194,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
               size: 20,
             ),
             const SizedBox(width: 12),
-            Expanded(child: Text(message)),
+            Expanded(
+                child: Text(
+              message,
+              style: const TextStyle(color: Colors.black, fontSize: 16),
+            )),
           ],
         ),
         backgroundColor: Theme.of(context).colorScheme.errorContainer,
@@ -608,10 +616,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
                       Expanded(
                         child: Text(
                           note.title.isEmpty ? 'Untitled' : note.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                height: 1.3,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -633,7 +642,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
                                 Icon(
                                   Icons.edit_rounded,
                                   size: 20,
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
                                 ),
                                 const SizedBox(width: 12),
                                 const Text('Edit'),
@@ -675,7 +685,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     Text(
                       note.content,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             height: 1.5,
                           ),
                       maxLines: 3,
@@ -694,7 +705,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
                       Text(
                         _formatDate(note.createdAt),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                               fontSize: 12,
                             ),
                       ),
@@ -727,7 +740,20 @@ class _NotesListScreenState extends State<NotesListScreen> {
     } else if (difference.inDays < 7) {
       return '${difference.inDays}d ago';
     } else {
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
       if (dateFormat) {
         return '${months[date.month - 1]} ${date.day}';
       } else {

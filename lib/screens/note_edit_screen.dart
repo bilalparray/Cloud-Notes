@@ -24,7 +24,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   final TextEditingController _contentController = TextEditingController();
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _contentFocusNode = FocusNode();
-  
+
   bool _isLoading = false;
   bool _hasChanges = false;
   bool _isSaving = false;
@@ -41,7 +41,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     }
     _titleController.addListener(_onTextChanged);
     _contentController.addListener(_onTextChanged);
-    
+
     // Auto-focus content if creating new note
     if (widget.note == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -138,10 +138,14 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 size: 20,
               ),
               const SizedBox(width: 12),
-              const Text('Note cannot be empty'),
+              const Text(
+                'Note cannot be empty',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
             ],
           ),
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          backgroundColor:
+              Theme.of(context).colorScheme.surfaceContainerHighest,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -196,7 +200,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('Failed to save: ${e.toString()}'),
+                  child: Text(
+                    'Failed to save: ${e.toString()}',
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  ),
                 ),
               ],
             ),
@@ -226,7 +233,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   Future<bool> _handleBack() async {
     // Cancel any pending auto-save
     _autoSaveTimer?.cancel();
-    
+
     // If there's an auto-save in progress, wait a bit
     if (_isAutoSaving) {
       await Future.delayed(const Duration(milliseconds: 500));
@@ -379,10 +386,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                       ),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            height: 1.3,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                height: 1.3,
+                              ),
                       maxLines: 2,
                       textCapitalization: TextCapitalization.sentences,
                     ),
@@ -469,10 +477,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                         const SizedBox(width: 6),
                         Text(
                           'Unsaved',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ],
                     ),
