@@ -166,6 +166,8 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
 
       // Generate invitation link - handle web and mobile differently
       String? baseUrl;
+      bool isDevelopment = true; // Set to false for production
+      
       if (kIsWeb) {
         try {
           final uri = Uri.base;
@@ -174,6 +176,12 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
               uri.hasAuthority && 
               (uri.scheme == 'http' || uri.scheme == 'https')) {
             baseUrl = '${uri.scheme}://${uri.authority}';
+            // If using localhost, it's development
+            if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
+              isDevelopment = true;
+            } else {
+              isDevelopment = false;
+            }
           }
         } catch (e) {
           // If Uri.base fails, use default
@@ -184,6 +192,7 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
       final link = _invitationService.generateInvitationLink(
         invitation.token,
         baseUrl: baseUrl,
+        isDevelopment: isDevelopment,
       );
       
       // Validate the link is a proper HTTP/HTTPS URL before showing

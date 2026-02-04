@@ -8,7 +8,8 @@ class InvitationService {
   final String _collectionName = 'invitations';
 
   String _generateToken() {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random.secure();
     return List.generate(32, (_) => chars[random.nextInt(chars.length)]).join();
   }
@@ -22,7 +23,7 @@ class InvitationService {
     try {
       String token = '';
       bool isUnique = false;
-      
+
       // Generate unique token
       while (!isUnique) {
         token = _generateToken();
@@ -102,21 +103,29 @@ class InvitationService {
             snapshot.docs.map((doc) => Invitation.fromFirestore(doc)).toList());
   }
 
-  String generateInvitationLink(String token, {String? baseUrl}) {
+  String generateInvitationLink(String token,
+      {String? baseUrl, bool isDevelopment = false}) {
     // For web, use the current origin if valid
-    if (baseUrl != null && 
-        baseUrl.isNotEmpty && 
+    if (baseUrl != null &&
+        baseUrl.isNotEmpty &&
         (baseUrl.startsWith('http://') || baseUrl.startsWith('https://'))) {
       // Ensure no trailing slash
-      final cleanUrl = baseUrl.endsWith('/') 
-          ? baseUrl.substring(0, baseUrl.length - 1) 
+      final cleanUrl = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
       return '$cleanUrl/join/$token';
     }
-    
-    // For mobile or invalid baseUrl, show a message that user needs to configure
-    // In production, you should set your actual domain here
-    // For now, return a placeholder that indicates configuration needed
+
+    // For development/testing: Use localhost
+    if (isDevelopment) {
+      return 'http://localhost:55926/join/$token';
+    }
+
+    // For mobile in development, you can use your local network IP
+    // Get your local IP with: ipconfig (Windows) or ifconfig (Mac/Linux)
+    // Example: 'http://192.168.1.100:5501/join/$token'
+
+    // For production, you should set your actual domain here
     return 'https://your-app-domain.com/join/$token';
   }
 }

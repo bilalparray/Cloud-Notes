@@ -31,11 +31,19 @@ class _InvitationAcceptanceScreenState
   bool _isLoading = true;
   String? _error;
   bool _isProcessing = false;
+  bool _isSigningIn = false;
 
   @override
   void initState() {
     super.initState();
     _loadInvitation();
+    // Listen for auth state changes to reload invitation after sign-in
+    _authService.authStateChanges.listen((user) {
+      if (user != null && _invitation != null && _workspace == null) {
+        // User just signed in, reload invitation to get workspace details
+        _loadInvitation();
+      }
+    });
   }
 
   Future<void> _loadInvitation() async {
@@ -60,19 +68,19 @@ class _InvitationAcceptanceScreenState
         return;
       }
 
-      final workspace = await _workspaceService.getWorkspaceById(invitation.workspaceId);
-      
-      if (workspace == null) {
-        setState(() {
-          _error = 'Workspace not found';
-          _isLoading = false;
-        });
-        return;
+      // Try to load workspace - if it fails due to permissions, we'll show invitation without workspace details
+      Workspace? workspace;
+      try {
+        workspace = await _workspaceService.getWorkspaceById(invitation.workspaceId);
+      } catch (e) {
+        // If workspace can't be loaded (permission denied), we'll show invitation without workspace details
+        // User will see workspace details after signing in
+        debugPrint('Could not load workspace: $e');
       }
 
       setState(() {
         _invitation = invitation;
-        _workspace = workspace;
+        _workspace = workspace; // May be null if permission denied
         _isLoading = false;
       });
     } catch (e) {
@@ -404,12 +412,37 @@ class _InvitationAcceptanceScreenState
                       ),
                       const SizedBox(height: 16),
                       FilledButton.icon(
-                        onPressed: () {
-                          // Auth wrapper will handle sign in
-                          // After sign in, user will need to open link again
+                        onPressed: _isSigningIn ? null : () async {
+                          setState(() {
+                            _isSigningIn = true;
+                          });
+                          try {
+                            await _authService.signInWithGoogle();
+                            // After sign in, reload the invitation to get workspace details
+                            // and show accept button
+                            if (mounted) {
+                              await _loadInvitation();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() {
+                                _isSigningIn = false;
+                              });
+                              _showErrorSnackBar('Sign in failed: $e');
+                            }
+                          }
                         },
-                        icon: const Icon(Icons.login_rounded),
-                        label: const Text('Sign In'),
+                        icon: _isSigningIn
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.login_rounded),
+                        label: Text(_isSigningIn ? 'Signing in...' : 'Sign In'),
                       ),
                     ],
                   )

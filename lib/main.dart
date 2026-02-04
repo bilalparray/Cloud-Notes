@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:app_links/app_links.dart';
+import 'dart:async';
 import 'config/firebase_config.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -145,13 +147,86 @@ class CloudNotesApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
 
+class _AuthWrapperState extends State<AuthWrapper> {
+  final AuthService authService = AuthService();
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+  String? _pendingInvitationToken;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+    _checkInitialLink();
+  }
+
+  void _initDeepLinks() {
+    if (kIsWeb) return; // Web handles links via URL routing
+
+    // Listen for deep links when app is running
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (Uri uri) {
+        _handleDeepLink(uri);
+      },
+      onError: (err) {
+        debugPrint('Deep link error: $err');
+      },
+    );
+  }
+
+  Future<void> _checkInitialLink() async {
+    if (kIsWeb) {
+      // Web: Check current URL
+      final uri = Uri.base;
+      if (uri.path.startsWith('/join/')) {
+        final token = uri.path.split('/join/').last;
+        setState(() {
+          _pendingInvitationToken = token;
+        });
+      }
+      return;
+    }
+
+    // Mobile: Check if app was opened via deep link
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleDeepLink(initialUri);
+      }
+    } catch (e) {
+      debugPrint('Error getting initial link: $e');
+    }
+  }
+
+  void _handleDeepLink(Uri uri) {
+    // Handle invitation links: https://domain.com/join/{token}
+    // or custom scheme: yourapp://join/{token}
+    final path = uri.path;
+    if (path.startsWith('/join/')) {
+      final token = path.split('/join/').last;
+      if (token.isNotEmpty) {
+        setState(() {
+          _pendingInvitationToken = token;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
@@ -165,15 +240,12 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
+        // If there's a pending invitation token, show invitation screen
+        if (_pendingInvitationToken != null) {
+          return InvitationAcceptanceScreen(token: _pendingInvitationToken!);
+        }
+
         if (snapshot.hasData) {
-          // Check if there's an invitation token in the URL (web only)
-          if (kIsWeb) {
-            final uri = Uri.base;
-            if (uri.path.startsWith('/join/')) {
-              final token = uri.path.split('/join/').last;
-              return InvitationAcceptanceScreen(token: token);
-            }
-          }
           return const WorkspacesListScreen();
         }
 

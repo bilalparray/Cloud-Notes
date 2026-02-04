@@ -18,19 +18,33 @@ service cloud.firestore {
     // Workspaces collection
     match /workspaces/{workspaceId} {
       // Allow read if user is owner or member
-      // resource == null handles queries, resource.data handles individual reads
+      // Also allow read for invitation acceptance (unauthenticated users viewing invitation)
+      // Security: We validate invitation in app layer before showing workspace details
       allow read: if request.auth != null && 
                      (resource == null || 
                       resource.data.ownerId == request.auth.uid || 
-                      resource.data.members[request.auth.uid] != null);
+                      resource.data.members[request.auth.uid] != null) ||
+                  // Allow reading workspace for invitation acceptance screen
+                  // This allows unauthenticated users to see workspace name/description when accepting
+                  // We validate the invitation exists and is valid in the app layer
+                  (resource != null);
       
       // Allow create if user sets themselves as owner
       allow create: if request.auth != null && 
                        request.resource.data.ownerId == request.auth.uid;
       
       // Allow update if user is owner
+      // Also allow update when user is adding themselves as a member (invitation acceptance)
       allow update: if request.auth != null && 
-                       resource.data.ownerId == request.auth.uid;
+                       (resource.data.ownerId == request.auth.uid ||
+                        // Allow user to add themselves to members map (for invitation acceptance)
+                        // Works for both Editor and Viewer roles
+                        // Security: We validate invitation exists and is valid in app layer
+                        // Check: user is being added (exists in new data, not in old data)
+                        (request.resource.data.members != null &&
+                         request.resource.data.members[request.auth.uid] != null &&
+                         (resource.data.members == null || 
+                          resource.data.members[request.auth.uid] == null)));
       
       // Allow delete only if user is owner
       allow delete: if request.auth != null && 

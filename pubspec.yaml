@@ -16,6 +16,9 @@ dependencies:
   cloud_firestore: ^5.4.4
   google_sign_in: ^6.2.1
   
+  # Deep Linking
+  app_links: ^6.3.1
+  
   # UI
   cupertino_icons: ^1.0.6
 
