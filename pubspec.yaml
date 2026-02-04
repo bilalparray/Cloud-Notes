@@ -26,6 +26,24 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+
+# App Icon Configuration
+# Step 1: Create a 1024x1024px PNG icon and save as assets/icon/icon.png
+# Step 2: Run: flutter pub get
+# Step 3: Run: flutter pub run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false  # Set to true if you have iOS folder set up
+  web:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#6366F1"
+    theme_color: "#6366F1"
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#6366F1"
+  # Optional: Create app_icon_foreground.png for Android adaptive icon
+  # adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
