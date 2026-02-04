@@ -25,7 +25,7 @@ class _InvitationAcceptanceScreenState
   final InvitationService _invitationService = InvitationService();
   final WorkspaceService _workspaceService = WorkspaceService();
   final AuthService _authService = AuthService();
-  
+
   Invitation? _invitation;
   Workspace? _workspace;
   bool _isLoading = true;
@@ -48,8 +48,9 @@ class _InvitationAcceptanceScreenState
 
   Future<void> _loadInvitation() async {
     try {
-      final invitation = await _invitationService.getInvitationByToken(widget.token);
-      
+      final invitation =
+          await _invitationService.getInvitationByToken(widget.token);
+
       if (invitation == null) {
         setState(() {
           _error = 'Invitation not found';
@@ -71,7 +72,8 @@ class _InvitationAcceptanceScreenState
       // Try to load workspace - if it fails due to permissions, we'll show invitation without workspace details
       Workspace? workspace;
       try {
-        workspace = await _workspaceService.getWorkspaceById(invitation.workspaceId);
+        workspace =
+            await _workspaceService.getWorkspaceById(invitation.workspaceId);
       } catch (e) {
         // If workspace can't be loaded (permission denied), we'll show invitation without workspace details
         // User will see workspace details after signing in
@@ -103,10 +105,35 @@ class _InvitationAcceptanceScreenState
     }
 
     // Check if user is already a member
-    if (_workspace!.ownerId == currentUser.uid ||
-        _workspace!.members.containsKey(currentUser.uid)) {
-      // User is already a member, just navigate
+    final isAlreadyMember = _workspace!.ownerId == currentUser.uid ||
+        _workspace!.members.containsKey(currentUser.uid);
+
+    // If user is owner, they can't change their role
+    if (_workspace!.ownerId == currentUser.uid) {
+      // User is owner, just navigate
       if (mounted) {
+        _showSuccessSnackBar('You are the owner of this workspace');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => WorkspaceNotesScreen(workspace: _workspace!),
+          ),
+          (route) => route.isFirst,
+        );
+      }
+      return;
+    }
+
+    // If user is already a member, check if role needs to be updated
+    final currentRole = isAlreadyMember
+        ? WorkspaceRole.fromString(
+            _workspace!.members[currentUser.uid] ?? 'viewer')
+        : null;
+    final newRole = WorkspaceRole.fromString(_invitation!.role);
+
+    // If already a member with the same role, just navigate
+    if (isAlreadyMember && currentRole == newRole) {
+      if (mounted) {
+        _showSuccessSnackBar('You already have ${newRole.value} access');
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (context) => WorkspaceNotesScreen(workspace: _workspace!),
@@ -122,11 +149,12 @@ class _InvitationAcceptanceScreenState
     });
 
     try {
-      // Add user to workspace
+      // Add or update user role in workspace
+      // This will add new members or update existing member roles
       await _workspaceService.addMemberToWorkspace(
         workspaceId: _workspace!.id!,
         userId: currentUser.uid,
-        role: WorkspaceRole.fromString(_invitation!.role),
+        role: newRole,
       );
 
       // Mark invitation as used
@@ -135,15 +163,45 @@ class _InvitationAcceptanceScreenState
         usedBy: currentUser.uid,
       );
 
-      // Get updated workspace
-      final updatedWorkspace =
-          await _workspaceService.getWorkspaceById(_workspace!.id!);
+      // Small delay to ensure Firestore has propagated the update
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Get updated workspace - retry a few times to ensure we get the latest data
+      Workspace? updatedWorkspace;
+      for (int i = 0; i < 3; i++) {
+        updatedWorkspace =
+            await _workspaceService.getWorkspaceById(_workspace!.id!);
+        if (updatedWorkspace != null) {
+          // Verify the role was actually updated
+          final actualRole = updatedWorkspace.getRoleForUser(currentUser.uid);
+          if (actualRole == newRole || i == 2) {
+            // Role matches or we've tried enough times
+            break;
+          }
+          // Wait a bit more and try again
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      }
 
       if (mounted && updatedWorkspace != null) {
-        _showSuccessSnackBar('Successfully joined workspace!');
+        // Show appropriate message based on whether role was updated or user joined
+        final actualRole = updatedWorkspace.getRoleForUser(currentUser.uid);
+        if (isAlreadyMember) {
+          if (actualRole == newRole) {
+            _showSuccessSnackBar(
+                'Role updated to ${newRole.value.toUpperCase()}!');
+          } else {
+            _showSuccessSnackBar(
+                'Role update in progress... (Current: ${actualRole.value.toUpperCase()})');
+          }
+        } else {
+          _showSuccessSnackBar(
+              'Successfully joined workspace as ${newRole.value.toUpperCase()}!');
+        }
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (context) => WorkspaceNotesScreen(workspace: updatedWorkspace),
+            builder: (context) =>
+                WorkspaceNotesScreen(workspace: updatedWorkspace!),
           ),
           (route) => false, // Remove all previous routes
         );
@@ -300,6 +358,23 @@ class _InvitationAcceptanceScreenState
     final isAlreadyMember = currentUser != null &&
         (_workspace!.ownerId == currentUser.uid ||
             _workspace!.members.containsKey(currentUser.uid));
+    
+    // Check if user needs role update
+    WorkspaceRole? currentRole;
+    WorkspaceRole? invitationRole;
+    bool needsRoleUpdate = false;
+    
+    if (currentUser != null && isAlreadyMember) {
+      if (_workspace!.ownerId == currentUser.uid) {
+        currentRole = WorkspaceRole.owner;
+      } else {
+        currentRole = WorkspaceRole.fromString(
+            _workspace!.members[currentUser.uid] ?? 'viewer');
+      }
+      invitationRole = WorkspaceRole.fromString(_invitation!.role);
+      needsRoleUpdate = currentRole != invitationRole && 
+                        currentRole != WorkspaceRole.owner;
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -385,13 +460,20 @@ class _InvitationAcceptanceScreenState
                             Icon(
                               Icons.person_rounded,
                               size: 16,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'Role: ${_invitation!.role.toUpperCase()}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                     fontWeight: FontWeight.w500,
                                   ),
                             ),
@@ -412,33 +494,36 @@ class _InvitationAcceptanceScreenState
                       ),
                       const SizedBox(height: 16),
                       FilledButton.icon(
-                        onPressed: _isSigningIn ? null : () async {
-                          setState(() {
-                            _isSigningIn = true;
-                          });
-                          try {
-                            await _authService.signInWithGoogle();
-                            // After sign in, reload the invitation to get workspace details
-                            // and show accept button
-                            if (mounted) {
-                              await _loadInvitation();
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              setState(() {
-                                _isSigningIn = false;
-                              });
-                              _showErrorSnackBar('Sign in failed: $e');
-                            }
-                          }
-                        },
+                        onPressed: _isSigningIn
+                            ? null
+                            : () async {
+                                setState(() {
+                                  _isSigningIn = true;
+                                });
+                                try {
+                                  await _authService.signInWithGoogle();
+                                  // After sign in, reload the invitation to get workspace details
+                                  // and show accept button
+                                  if (mounted) {
+                                    await _loadInvitation();
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    setState(() {
+                                      _isSigningIn = false;
+                                    });
+                                    _showErrorSnackBar('Sign in failed: $e');
+                                  }
+                                }
+                              },
                         icon: _isSigningIn
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
                                 ),
                               )
                             : const Icon(Icons.login_rounded),
@@ -446,7 +531,7 @@ class _InvitationAcceptanceScreenState
                       ),
                     ],
                   )
-                else if (isAlreadyMember)
+                else if (isAlreadyMember && !needsRoleUpdate)
                   Column(
                     children: [
                       Text(
@@ -454,6 +539,15 @@ class _InvitationAcceptanceScreenState
                         style: Theme.of(context).textTheme.bodyLarge,
                         textAlign: TextAlign.center,
                       ),
+                      if (currentRole != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Current role: ${currentRole.value.toUpperCase()}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       FilledButton.icon(
                         onPressed: () {
@@ -470,6 +564,49 @@ class _InvitationAcceptanceScreenState
                       ),
                     ],
                   )
+                else if (isAlreadyMember && needsRoleUpdate)
+                  Column(
+                    children: [
+                      Text(
+                        'Update Your Role',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'You are currently ${currentRole?.value.toUpperCase() ?? 'UNKNOWN'}. Accept this invitation to become ${invitationRole?.value.toUpperCase() ?? 'UNKNOWN'}.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        onPressed: _isProcessing ? null : _handleAcceptInvitation,
+                        icon: _isProcessing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.upgrade_rounded),
+                        label: Text(
+                            _isProcessing
+                                ? 'Updating Role...'
+                                : 'Update to ${invitationRole?.value.toUpperCase() ?? 'UNKNOWN'}'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
                 else
                   FilledButton.icon(
                     onPressed: _isProcessing ? null : _handleAcceptInvitation,
@@ -479,11 +616,13 @@ class _InvitationAcceptanceScreenState
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Icon(Icons.check_rounded),
-                    label: Text(_isProcessing ? 'Joining...' : 'Accept Invitation'),
+                    label: Text(
+                        _isProcessing ? 'Joining...' : 'Accept Invitation'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,

@@ -82,12 +82,27 @@ class WorkspaceService {
     required WorkspaceRole role,
   }) async {
     try {
-      await _firestore
-          .collection(_collectionName)
-          .doc(workspaceId)
-          .update({
-        'members.$userId': role.value,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      // Use a transaction to read current workspace, update members, and write back
+      // This ensures security rules can properly evaluate the update
+      await _firestore.runTransaction((transaction) async {
+        final workspaceRef = _firestore.collection(_collectionName).doc(workspaceId);
+        final workspaceDoc = await transaction.get(workspaceRef);
+        
+        if (!workspaceDoc.exists) {
+          throw Exception('Workspace not found');
+        }
+        
+        final currentData = workspaceDoc.data()!;
+        final currentMembers = Map<String, String>.from(currentData['members'] ?? {});
+        
+        // Add the new member
+        currentMembers[userId] = role.value;
+        
+        // Update the workspace with the full members map
+        transaction.update(workspaceRef, {
+          'members': currentMembers,
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+        });
       });
     } catch (e) {
       throw Exception('Failed to add member: $e');
