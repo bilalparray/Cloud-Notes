@@ -104,9 +104,11 @@ class _LoginScreenState extends State<LoginScreen>
                 ? [
                     colorScheme.surface,
                     colorScheme.surfaceContainerHighest,
+                    colorScheme.primaryContainer.withOpacity(0.2),
                   ]
                 : [
-                    colorScheme.primaryContainer.withOpacity(0.3),
+                    colorScheme.primaryContainer.withOpacity(0.4),
+                    colorScheme.secondaryContainer.withOpacity(0.3),
                     colorScheme.surface,
                   ],
           ),
@@ -125,13 +127,27 @@ class _LoginScreenState extends State<LoginScreen>
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              colorScheme.primary,
+                              colorScheme.secondary,
+                            ],
+                          ),
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.primary.withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
                         ),
                         child: Icon(
                           Icons.note_rounded,
                           size: 64,
-                          color: colorScheme.onPrimaryContainer,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 32),

@@ -21,8 +21,16 @@ class CloudNotesApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2196F3),
+          seedColor: const Color(0xFF6366F1), // Indigo - more vibrant
           brightness: Brightness.light,
+        ).copyWith(
+          primary: const Color(0xFF6366F1),
+          secondary: const Color(0xFF8B5CF6),
+          tertiary: const Color(0xFFEC4899),
+          surface: const Color(0xFFFFFBFE),
+          surfaceContainerHighest: const Color(0xFFF5F3FF),
+          primaryContainer: const Color(0xFFE0E7FF),
+          secondaryContainer: const Color(0xFFF3E8FF),
         ),
         useMaterial3: true,
         cardTheme: CardThemeData(
@@ -30,6 +38,7 @@ class CloudNotesApp extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          color: Colors.white,
         ),
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(
@@ -37,12 +46,16 @@ class CloudNotesApp extends StatelessWidget {
           ),
           filled: true,
         ),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          backgroundColor: const Color(0xFFFFFBFE),
+          foregroundColor: const Color(0xFF1E1B4B),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 4,
+          backgroundColor: const Color(0xFF6366F1),
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -50,8 +63,16 @@ class CloudNotesApp extends StatelessWidget {
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2196F3),
+          seedColor: const Color(0xFF818CF8), // Lighter indigo for dark mode
           brightness: Brightness.dark,
+        ).copyWith(
+          primary: const Color(0xFF818CF8),
+          secondary: const Color(0xFFA78BFA),
+          tertiary: const Color(0xFFF472B6),
+          surface: const Color(0xFF1E1B4B),
+          surfaceContainerHighest: const Color(0xFF312E81),
+          primaryContainer: const Color(0xFF4338CA),
+          secondaryContainer: const Color(0xFF6D28D9),
         ),
         useMaterial3: true,
         cardTheme: CardThemeData(
@@ -59,6 +80,7 @@ class CloudNotesApp extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          color: const Color(0xFF312E81),
         ),
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(
@@ -69,9 +91,13 @@ class CloudNotesApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          backgroundColor: Color(0xFF1E1B4B),
+          foregroundColor: Colors.white,
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 4,
+          backgroundColor: const Color(0xFF818CF8),
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/note.dart';
@@ -27,7 +28,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   bool _isLoading = false;
   bool _hasChanges = false;
   bool _isSaving = false;
+  bool _isAutoSaving = false;
   DateTime? _lastSaveTime;
+  Timer? _autoSaveTimer;
 
   @override
   void initState() {
@@ -48,16 +51,70 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   }
 
   void _onTextChanged() {
-    if (!_hasChanges) {
-      setState(() {
-        _hasChanges = true;
-        _isSaving = false;
-      });
+    // Update UI immediately for word/char count
+    setState(() {
+      _hasChanges = true;
+      _isSaving = false;
+    });
+
+    // Reset auto-save timer
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(seconds: 2), () {
+      if (_hasChanges && mounted) {
+        _autoSave();
+      }
+    });
+  }
+
+  Future<void> _autoSave() async {
+    final title = _titleController.text.trim();
+    final content = _contentController.text.trim();
+
+    // Don't auto-save empty notes
+    if (title.isEmpty && content.isEmpty) {
+      return;
+    }
+
+    // Don't auto-save if it's a new note (need to create it first manually)
+    if (widget.note == null) {
+      return;
+    }
+
+    setState(() {
+      _isAutoSaving = true;
+    });
+
+    try {
+      final note = Note(
+        id: widget.note!.id,
+        title: title,
+        content: content,
+        createdAt: widget.note!.createdAt,
+        userId: widget.userId,
+      );
+
+      await _notesService.updateNote(note);
+
+      if (mounted) {
+        setState(() {
+          _hasChanges = false;
+          _isAutoSaving = false;
+          _lastSaveTime = DateTime.now();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAutoSaving = false;
+        });
+        // Silently fail for auto-save, user can manually save
+      }
     }
   }
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
     _titleController.dispose();
     _contentController.dispose();
     _titleFocusNode.dispose();
@@ -167,6 +224,14 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   }
 
   Future<bool> _handleBack() async {
+    // Cancel any pending auto-save
+    _autoSaveTimer?.cancel();
+    
+    // If there's an auto-save in progress, wait a bit
+    if (_isAutoSaving) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     if (!_hasChanges) {
       return true;
     }
@@ -208,7 +273,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   int get _wordCount {
     final text = _contentController.text.trim();
     if (text.isEmpty) return 0;
-    return text.split(RegExp(r'\s+')).length;
+    return text.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
   }
 
   int get _charCount => _contentController.text.length;
@@ -240,15 +305,39 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 widget.note == null ? 'New Note' : 'Edit Note',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              if (_isSaving || _lastSaveTime != null)
-                Text(
-                  _isSaving
-                      ? 'Saving...'
-                      : 'Saved ${_formatSaveTime(_lastSaveTime!)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 11,
+              if (_isSaving || _isAutoSaving || _lastSaveTime != null)
+                Row(
+                  children: [
+                    if (_isSaving || _isAutoSaving)
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            colorScheme.primary,
+                          ),
+                        ),
+                      )
+                    else
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 12,
+                        color: Colors.green.shade400,
                       ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _isSaving
+                          ? 'Saving...'
+                          : _isAutoSaving
+                              ? 'Auto-saving...'
+                              : 'Saved ${_formatSaveTime(_lastSaveTime!)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -340,44 +429,49 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       Icon(
                         Icons.text_fields_rounded,
                         size: 16,
-                        color: colorScheme.onSurfaceVariant,
+                        color: colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '$_wordCount words',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
                             ),
                       ),
                       const SizedBox(width: 16),
                       Icon(
                         Icons.abc_rounded,
                         size: 16,
-                        color: colorScheme.onSurfaceVariant,
+                        color: colorScheme.secondary,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '$_charCount chars',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
                             ),
                       ),
                     ],
                   ),
-                  if (_hasChanges && !_isSaving)
+                  if (_hasChanges && !_isSaving && !_isAutoSaving)
                     Row(
                       children: [
-                        Icon(
-                          Icons.circle,
-                          size: 8,
-                          color: colorScheme.primary,
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                         const SizedBox(width: 6),
                         Text(
                           'Unsaved',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: colorScheme.primary,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                         ),
                       ],

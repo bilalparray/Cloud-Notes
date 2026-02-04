@@ -567,7 +567,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.error,
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.error,
+                Theme.of(context).colorScheme.error.withOpacity(0.8),
+              ],
+            ),
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Icon(
