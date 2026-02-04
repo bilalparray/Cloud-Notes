@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/invitation.dart';
 import '../models/workspace.dart';
+import '../config/firebase_config.dart';
 
 class InvitationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -101,18 +102,17 @@ class InvitationService {
         .where('workspaceId', isEqualTo: workspaceId)
         .snapshots()
         .map((snapshot) {
-          final invitations = snapshot.docs
-              .map((doc) => Invitation.fromFirestore(doc))
-              .toList();
-          // Sort by createdAt descending
-          invitations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return invitations;
-        });
+      final invitations =
+          snapshot.docs.map((doc) => Invitation.fromFirestore(doc)).toList();
+      // Sort by createdAt descending
+      invitations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return invitations;
+    });
   }
 
   String generateInvitationLink(String token,
       {String? baseUrl, bool isDevelopment = false}) {
-    // For web, use the current origin if valid
+    // Priority 1: Use provided baseUrl if valid
     if (baseUrl != null &&
         baseUrl.isNotEmpty &&
         (baseUrl.startsWith('http://') || baseUrl.startsWith('https://'))) {
@@ -123,16 +123,21 @@ class InvitationService {
       return '$cleanUrl/join/$token';
     }
 
-    // For development/testing: Use localhost
+    // Priority 2: Use config file baseUrl if set
+    if (FirebaseConfig.appBaseUrl.isNotEmpty) {
+      final cleanUrl = FirebaseConfig.appBaseUrl.endsWith('/')
+          ? FirebaseConfig.appBaseUrl
+              .substring(0, FirebaseConfig.appBaseUrl.length - 1)
+          : FirebaseConfig.appBaseUrl;
+      return '$cleanUrl/join/$token';
+    }
+
+    // Priority 3: For development/testing: Use localhost (fallback)
     if (isDevelopment) {
       return 'http://localhost:55926/join/$token';
     }
 
-    // For mobile in development, you can use your local network IP
-    // Get your local IP with: ipconfig (Windows) or ifconfig (Mac/Linux)
-    // Example: 'http://192.168.1.100:5501/join/$token'
-
-    // For production, you should set your actual domain here
-    return 'https://your-app-domain.com/join/$token';
+    // Priority 4: Use production domain from config
+    return '${FirebaseConfig.productionDomain}/join/$token';
   }
 }
