@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/notes_service.dart';
 import '../services/workspace_service.dart';
 import 'note_edit_screen.dart';
+import 'workspace_members_screen.dart';
 
 class WorkspaceNotesScreen extends StatefulWidget {
   final Workspace workspace;
@@ -34,7 +35,14 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
     super.initState();
     _currentUser = _authService.currentUser;
     _currentWorkspace = widget.workspace;
-    // Initial load - will be updated by StreamBuilder below
+    // Load workspace once to ensure we have the latest data
+    _workspaceService.getWorkspaceById(widget.workspace.id!).then((workspace) {
+      if (workspace != null && mounted) {
+        setState(() {
+          _currentWorkspace = workspace;
+        });
+      }
+    });
   }
 
   @override
@@ -115,7 +123,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Note "$noteTitle" deleted'),
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -224,9 +233,67 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
     return StreamBuilder<Workspace?>(
       stream: _workspaceService.getWorkspaceStream(widget.workspace.id!),
       builder: (context, workspaceSnapshot) {
+        // Handle loading state
+        if (workspaceSnapshot.connectionState == ConnectionState.waiting &&
+            workspaceSnapshot.data == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(widget.workspace.name),
+            ),
+            body: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        // Handle error state
+        if (workspaceSnapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(widget.workspace.name),
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading workspace',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    workspaceSnapshot.error.toString(),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         // Use the latest workspace from stream, or fallback to widget.workspace
-        final workspace = workspaceSnapshot.data ?? _currentWorkspace ?? widget.workspace;
-        
+        final workspace =
+            workspaceSnapshot.data ?? _currentWorkspace ?? widget.workspace;
+
+        // Ensure workspace has an ID
+        if (workspace.id == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Error'),
+            ),
+            body: const Center(
+              child: Text('Invalid workspace'),
+            ),
+          );
+        }
+
         // Update _currentWorkspace when stream updates
         if (workspaceSnapshot.hasData && workspaceSnapshot.data != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -239,7 +306,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
         }
 
         // Check edit permissions with current workspace
-        final canEdit = _currentUser != null && workspace.canEdit(_currentUser!.uid);
+        final canEdit =
+            _currentUser != null && workspace.canEdit(_currentUser!.uid);
 
         return Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surface,
@@ -259,7 +327,10 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  workspace.getRoleForUser(_currentUser!.uid).value.toUpperCase(),
+                  workspace
+                      .getRoleForUser(_currentUser!.uid)
+                      .value
+                      .toUpperCase(),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 11,
@@ -280,7 +351,22 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                   },
                   tooltip: 'Close search',
                 )
-              else
+              else ...[
+                // Show members management button only for owners
+                if (workspace.ownerId == _currentUser!.uid)
+                  IconButton(
+                    icon: const Icon(Icons.people_rounded),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => WorkspaceMembersScreen(
+                            workspace: workspace,
+                          ),
+                        ),
+                      );
+                    },
+                    tooltip: 'Manage Members',
+                  ),
                 IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: () {
@@ -290,6 +376,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                   },
                   tooltip: 'Search',
                 ),
+              ],
             ],
           ),
           body: _isSearching
@@ -322,111 +409,158 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                 )
               : StreamBuilder<List<Note>>(
                   stream: _notesService.getNotesStream(workspace.id!),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
+                  builder: (context, snapshot) {
+                    // Show loading only on initial load
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline_rounded,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading notes',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          snapshot.error.toString(),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final allNotes = snapshot.data ?? [];
-                final filteredNotes = _filterNotes(allNotes);
-
-                if (allNotes.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.note_add_rounded,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No notes yet',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error loading notes',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                snapshot.error.toString(),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              // Check if it's a missing index error
+                              if (snapshot.error.toString().contains('index'))
+                                Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      children: [
+                                        const Text(
+                                          'Missing Firestore Index',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'You need to create a composite index in Firebase Console.',
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Collection: notes\nFields: workspaceId (Ascending), createdAt (Descending)',
+                                          style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 12),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            canEdit
-                                ? 'Create your first note in this workspace'
-                                : 'No notes in this workspace yet',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                            textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+
+                    final allNotes = snapshot.data ?? [];
+                    final filteredNotes = _filterNotes(allNotes);
+
+                    if (allNotes.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.note_add_rounded,
+                                size: 64,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No notes yet',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                canEdit
+                                    ? 'Create your first note in this workspace'
+                                    : 'No notes in this workspace yet',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
+                      );
+                    }
+
+                    if (filteredNotes.isEmpty && _searchQuery.isNotEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off_rounded,
+                              size: 64,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No results found',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        await Future.delayed(const Duration(milliseconds: 500));
+                      },
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        itemCount: filteredNotes.length,
+                        itemBuilder: (context, index) {
+                          final note = filteredNotes[index];
+                          return _buildNoteCard(note, index, canEdit);
+                        },
                       ),
-                    ),
-                  );
-                }
-
-                if (filteredNotes.isEmpty && _searchQuery.isNotEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off_rounded,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No results found',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    await Future.delayed(const Duration(milliseconds: 500));
+                    );
                   },
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    itemCount: filteredNotes.length,
-                    itemBuilder: (context, index) {
-                      final note = filteredNotes[index];
-                      return _buildNoteCard(note, index, canEdit);
-                    },
-                  ),
-                );
-              },
                 ),
           floatingActionButton: canEdit
               ? FloatingActionButton.extended(
@@ -454,7 +588,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
       },
       child: Dismissible(
         key: Key(note.id ?? 'note-$index'),
-        direction: _canEdit ? DismissDirection.endToStart : DismissDirection.none,
+        direction:
+            _canEdit ? DismissDirection.endToStart : DismissDirection.none,
         background: Container(
           margin: const EdgeInsets.only(bottom: 12),
           alignment: Alignment.centerRight,
@@ -501,10 +636,11 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                       Expanded(
                         child: Text(
                           note.title.isEmpty ? 'Untitled' : note.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                height: 1.3,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -514,7 +650,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                           icon: Icon(
                             Icons.more_vert_rounded,
                             size: 20,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -527,7 +664,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                                   Icon(
                                     Icons.edit_rounded,
                                     size: 20,
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                   const SizedBox(width: 12),
                                   const Text('Edit'),
@@ -547,7 +685,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                                   Text(
                                     'Delete',
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.error,
+                                      color:
+                                          Theme.of(context).colorScheme.error,
                                     ),
                                   ),
                                 ],
@@ -569,7 +708,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                     Text(
                       note.content,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             height: 1.5,
                           ),
                       maxLines: 3,
@@ -588,7 +728,9 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                       Text(
                         _formatDate(note.createdAt),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                               fontSize: 12,
                             ),
                       ),

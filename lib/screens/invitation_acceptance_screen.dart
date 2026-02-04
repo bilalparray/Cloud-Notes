@@ -155,6 +155,8 @@ class _InvitationAcceptanceScreenState
         workspaceId: _workspace!.id!,
         userId: currentUser.uid,
         role: newRole,
+        displayName: currentUser.displayName,
+        email: currentUser.email,
       );
 
       // Mark invitation as used

@@ -94,13 +94,20 @@ class InvitationService {
   }
 
   Stream<List<Invitation>> getInvitationsForWorkspace(String workspaceId) {
+    // Query without orderBy first (no index required) and sort in memory
+    // This avoids the infinite loading issue when index is missing
     return _firestore
         .collection(_collectionName)
         .where('workspaceId', isEqualTo: workspaceId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Invitation.fromFirestore(doc)).toList());
+        .map((snapshot) {
+          final invitations = snapshot.docs
+              .map((doc) => Invitation.fromFirestore(doc))
+              .toList();
+          // Sort by createdAt descending
+          invitations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return invitations;
+        });
   }
 
   String generateInvitationLink(String token,

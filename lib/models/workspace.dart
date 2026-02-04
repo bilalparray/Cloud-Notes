@@ -22,6 +22,7 @@ class Workspace {
   final DateTime createdAt;
   final DateTime updatedAt;
   final Map<String, String> members; // userId -> role
+  final Map<String, String> memberNames; // userId -> displayName
 
   Workspace({
     this.id,
@@ -31,7 +32,8 @@ class Workspace {
     required this.createdAt,
     required this.updatedAt,
     required this.members,
-  });
+    Map<String, String>? memberNames,
+  }) : memberNames = memberNames ?? {};
 
   factory Workspace.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -43,6 +45,7 @@ class Workspace {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
       members: Map<String, String>.from(data['members'] ?? {}),
+      memberNames: Map<String, String>.from(data['memberNames'] ?? {}),
     );
   }
 
@@ -54,6 +57,7 @@ class Workspace {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'members': members,
+      'memberNames': memberNames,
     };
   }
 
@@ -81,6 +85,7 @@ class Workspace {
     DateTime? createdAt,
     DateTime? updatedAt,
     Map<String, String>? members,
+    Map<String, String>? memberNames,
   }) {
     return Workspace(
       id: id ?? this.id,
@@ -90,6 +95,11 @@ class Workspace {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       members: members ?? this.members,
+      memberNames: memberNames ?? this.memberNames,
     );
+  }
+  
+  String? getMemberName(String userId) {
+    return memberNames[userId];
   }
 }

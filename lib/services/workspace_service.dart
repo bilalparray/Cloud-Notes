@@ -50,6 +50,7 @@ class WorkspaceService {
         createdAt: now,
         updatedAt: now,
         members: {}, // Owner is not in members map, they're the ownerId
+        memberNames: {}, // Initialize empty memberNames map
       );
 
       final docRef = await _firestore
@@ -80,6 +81,8 @@ class WorkspaceService {
     required String workspaceId,
     required String userId,
     required WorkspaceRole role,
+    String? displayName,
+    String? email,
   }) async {
     try {
       // Use a transaction to read current workspace, update members, and write back
@@ -94,18 +97,48 @@ class WorkspaceService {
         
         final currentData = workspaceDoc.data()!;
         final currentMembers = Map<String, String>.from(currentData['members'] ?? {});
+        final currentMemberNames = Map<String, String>.from(currentData['memberNames'] ?? {});
         
         // Add the new member
         currentMembers[userId] = role.value;
         
+        // Store member name if provided
+        if (displayName != null && displayName.isNotEmpty) {
+          currentMemberNames[userId] = displayName;
+        } else if (email != null && email.isNotEmpty) {
+          // Use email as fallback if no display name
+          currentMemberNames[userId] = email.split('@').first;
+        }
+        
         // Update the workspace with the full members map
         transaction.update(workspaceRef, {
           'members': currentMembers,
+          'memberNames': currentMemberNames,
           'updatedAt': Timestamp.fromDate(DateTime.now()),
         });
       });
     } catch (e) {
       throw Exception('Failed to add member: $e');
+    }
+  }
+
+  Future<void> updateMemberRole({
+    required String workspaceId,
+    required String userId,
+    required WorkspaceRole newRole,
+  }) async {
+    try {
+      // Use regular update instead of transaction to avoid conflicts with StreamBuilder
+      // Owner updates don't need transaction isolation
+      await _firestore
+          .collection(_collectionName)
+          .doc(workspaceId)
+          .update({
+        'members.$userId': newRole.value,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+    } catch (e) {
+      throw Exception('Failed to update member role: $e');
     }
   }
 
@@ -119,6 +152,7 @@ class WorkspaceService {
           .doc(workspaceId)
           .update({
         'members.$userId': FieldValue.delete(),
+        'memberNames.$userId': FieldValue.delete(),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       });
     } catch (e) {
