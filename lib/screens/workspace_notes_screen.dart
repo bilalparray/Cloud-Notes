@@ -34,14 +34,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
     super.initState();
     _currentUser = _authService.currentUser;
     _currentWorkspace = widget.workspace;
-    // Listen for workspace updates
-    _workspaceService.getWorkspaceById(widget.workspace.id!).then((workspace) {
-      if (workspace != null && mounted) {
-        setState(() {
-          _currentWorkspace = workspace;
-        });
-      }
-    });
+    // Initial load - will be updated by StreamBuilder below
   }
 
   @override
@@ -227,87 +220,108 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _currentWorkspace!.name,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+    // Use StreamBuilder to listen for workspace updates in real-time
+    return StreamBuilder<Workspace?>(
+      stream: _workspaceService.getWorkspaceStream(widget.workspace.id!),
+      builder: (context, workspaceSnapshot) {
+        // Use the latest workspace from stream, or fallback to widget.workspace
+        final workspace = workspaceSnapshot.data ?? _currentWorkspace ?? widget.workspace;
+        
+        // Update _currentWorkspace when stream updates
+        if (workspaceSnapshot.hasData && workspaceSnapshot.data != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _currentWorkspace != workspaceSnapshot.data) {
+              setState(() {
+                _currentWorkspace = workspaceSnapshot.data;
+              });
+            }
+          });
+        }
+
+        // Check edit permissions with current workspace
+        final canEdit = _currentUser != null && workspace.canEdit(_currentUser!.uid);
+
+        return Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          appBar: AppBar(
+            elevation: 0,
+            scrolledUnderElevation: 1,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
             ),
-            Text(
-              _currentWorkspace!.getRoleForUser(_currentUser!.uid).value.toUpperCase(),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  workspace.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  workspace.getRoleForUser(_currentUser!.uid).value.toUpperCase(),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          if (_isSearching)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                setState(() {
-                  _isSearching = false;
-                  _searchQuery = '';
-                  _searchController.clear();
-                });
-              },
-              tooltip: 'Close search',
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                setState(() {
-                  _isSearching = true;
-                });
-              },
-              tooltip: 'Search',
-            ),
-        ],
-      ),
-      body: _isSearching
-          ? Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search notes...',
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
+            actions: [
+              if (_isSearching)
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      _isSearching = false;
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                  tooltip: 'Close search',
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () {
+                    setState(() {
+                      _isSearching = true;
+                    });
+                  },
+                  tooltip: 'Search',
+                ),
+            ],
+          ),
+          body: _isSearching
+              ? Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search notes...',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          setState(() {
+                            _isSearching = false;
+                            _searchQuery = '';
+                            _searchController.clear();
+                          });
+                        },
+                      ),
+                    ),
+                    onChanged: (value) {
                       setState(() {
-                        _isSearching = false;
-                        _searchQuery = '';
-                        _searchController.clear();
+                        _searchQuery = value;
                       });
                     },
                   ),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-              ),
-            )
-          : StreamBuilder<List<Note>>(
-              stream: _notesService.getNotesStream(_currentWorkspace!.id!),
+                )
+              : StreamBuilder<List<Note>>(
+                  stream: _notesService.getNotesStream(workspace.id!),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -365,7 +379,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            _canEdit
+                            canEdit
                                 ? 'Create your first note in this workspace'
                                 : 'No notes in this workspace yet',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -408,24 +422,26 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                     itemCount: filteredNotes.length,
                     itemBuilder: (context, index) {
                       final note = filteredNotes[index];
-                      return _buildNoteCard(note, index);
+                      return _buildNoteCard(note, index, canEdit);
                     },
                   ),
                 );
               },
-            ),
-      floatingActionButton: _canEdit
-          ? FloatingActionButton.extended(
-              onPressed: _handleCreateNote,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New Note'),
-              elevation: 4,
-            )
-          : null,
+                ),
+          floatingActionButton: canEdit
+              ? FloatingActionButton.extended(
+                  onPressed: _handleCreateNote,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('New Note'),
+                  elevation: 4,
+                )
+              : null,
+        );
+      },
     );
   }
 
-  Widget _buildNoteCard(Note note, int index) {
+  Widget _buildNoteCard(Note note, int index, bool canEdit) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: Duration(milliseconds: 300 + (index * 50)),
@@ -493,7 +509,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (_canEdit)
+                      if (canEdit)
                         PopupMenuButton<String>(
                           icon: Icon(
                             Icons.more_vert_rounded,

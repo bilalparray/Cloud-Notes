@@ -146,4 +146,16 @@ class WorkspaceService {
       throw Exception('Failed to get workspace: $e');
     }
   }
+
+  // Stream to listen for workspace updates in real-time
+  Stream<Workspace?> getWorkspaceStream(String workspaceId) {
+    return _firestore
+        .collection(_collectionName)
+        .doc(workspaceId)
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) return null;
+      return Workspace.fromFirestore(doc);
+    });
+  }
 }
