@@ -69,7 +69,10 @@ class _LoginScreenState extends State<LoginScreen>
                 Expanded(
                   child: Text(
                     'Sign in failed: ${e.toString()}',
-                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ],

@@ -5,10 +5,10 @@ class NotesService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionName = 'notes';
 
-  Stream<List<Note>> getNotesStream(String userId) {
+  Stream<List<Note>> getNotesStream(String workspaceId) {
     return _firestore
         .collection(_collectionName)
-        .where('userId', isEqualTo: userId)
+        .where('workspaceId', isEqualTo: workspaceId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>

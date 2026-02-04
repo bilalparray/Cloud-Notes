@@ -5,7 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'config/firebase_config.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/notes_list_screen.dart';
+import 'screens/workspaces_list_screen.dart';
+import 'screens/invitation_acceptance_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,6 +53,8 @@ class CloudNotesApp extends StatelessWidget {
           surfaceContainerHighest: const Color(0xFFF5F3FF),
           primaryContainer: const Color(0xFFE0E7FF),
           secondaryContainer: const Color(0xFFF3E8FF),
+          errorContainer: const Color(0xFFFFDAD6), // Light red/pink background
+          onErrorContainer: const Color(0xFF410002), // Dark text on error container
         ),
         useMaterial3: true,
         cardTheme: CardThemeData(
@@ -94,6 +97,8 @@ class CloudNotesApp extends StatelessWidget {
           surfaceContainerHighest: const Color(0xFF312E81),
           primaryContainer: const Color(0xFF4338CA),
           secondaryContainer: const Color(0xFF6D28D9),
+          errorContainer: const Color(0xFF93000A), // Dark red background for dark mode
+          onErrorContainer: const Color(0xFFFFDAD6), // Light text on error container for dark mode
         ),
         useMaterial3: true,
         cardTheme: CardThemeData(
@@ -125,6 +130,16 @@ class CloudNotesApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
+      onGenerateRoute: (settings) {
+        // Handle invitation links: /join/{token}
+        if (settings.name?.startsWith('/join/') == true) {
+          final token = settings.name!.split('/join/').last;
+          return MaterialPageRoute(
+            builder: (context) => InvitationAcceptanceScreen(token: token),
+          );
+        }
+        return null;
+      },
       home: const AuthWrapper(),
     );
   }
@@ -151,7 +166,15 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          return const NotesListScreen();
+          // Check if there's an invitation token in the URL (web only)
+          if (kIsWeb) {
+            final uri = Uri.base;
+            if (uri.path.startsWith('/join/')) {
+              final token = uri.path.split('/join/').last;
+              return InvitationAcceptanceScreen(token: token);
+            }
+          }
+          return const WorkspacesListScreen();
         }
 
         return const LoginScreen();

@@ -1,11 +1,14 @@
-# Cloud Notes
+# TeamDocs (formerly Cloud Notes)
 
-A Flutter application for cloud-synced notes with Google authentication. Notes are automatically synced in real-time across all your devices using Firebase Firestore.
+A Flutter application for team collaboration with workspaces, invitations, and role-based access control. Built with Firebase and Google Sign-In.
 
 ## Features
 
 - 🔐 Google Sign-In authentication (auto-registration on first login)
-- 📝 Create, edit, and delete notes
+- 👥 **Workspaces** - Organize notes by team or project
+- 🎫 **Invitation System** - Secure token-based team invitations
+- 👤 **Role-Based Access** - Owner, Editor, and Viewer roles
+- 📝 Create, edit, and delete notes (with role-based permissions)
 - ☁️ Real-time synchronization across devices
 - 🌙 Dark mode support (follows system theme)
 - 🎨 Material Design 3 UI
@@ -45,44 +48,30 @@ A Flutter application for cloud-synced notes with Google authentication. Notes a
 
 ### 4. Set up Firestore Security Rules
 
-Add the following security rules to ensure users can only access their own notes:
+Copy the complete security rules from `FIRESTORE_SECURITY_RULES.txt` or `FIRESTORE_SECURITY_RULES.md` and paste them into Firebase Console > Firestore > Rules.
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /notes/{noteId} {
-      // Allow read (both queries and individual reads) if user owns the note
-      // For queries: resource == null, so we check the query constraint
-      // For individual reads: resource.data.userId must match
-      allow read: if request.auth != null && 
-                     (resource == null || resource.data.userId == request.auth.uid);
-      
-      // Allow create if user is authenticated and sets their own userId
-      allow create: if request.auth != null && 
-                       request.resource.data.userId == request.auth.uid;
-      
-      // Allow update if user owns the note and keeps their userId
-      allow update: if request.auth != null && 
-                       resource.data.userId == request.auth.uid &&
-                       request.resource.data.userId == request.auth.uid;
-      
-      // Allow delete if user owns the note
-      allow delete: if request.auth != null && 
-                       resource.data.userId == request.auth.uid;
-    }
-  }
-}
-```
+**Steps:**
+1. Open Firebase Console: https://console.firebase.google.com
+2. Select your project
+3. Go to Firestore Database → Rules tab
+4. Copy the rules from `FIRESTORE_SECURITY_RULES.txt`
+5. Paste into the Rules editor
+6. Click "Publish"
+7. Wait 1-2 minutes for rules to propagate
 
 **Important:** 
-- The `resource == null` check allows queries to proceed (Firestore validates individual documents as they're returned)
-- Make sure your queries always filter by `userId` matching the authenticated user's UID (which the app does automatically)
-- After updating these rules, click "Publish" in the Firebase Console to apply them
+- These rules support workspace-based access control with roles (Owner, Editor, Viewer)
+- Users can only access notes in workspaces they belong to
+- Only owners and editors can create/edit/delete notes
+- Viewers can only read notes
 
-### 5. Create Firestore Composite Index
+### 5. Create Firestore Composite Indexes
 
-The app queries notes by `userId` and orders by `createdAt`. Firestore requires a composite index for this query.
+The app requires composite indexes for workspace-based queries:
+
+**Index 1: Notes by workspace**
+- Collection: `notes`
+- Fields: `workspaceId` (Ascending), `createdAt` (Descending)
 
 **Option 1 (Automatic):**
 When you first run the app and query notes, Firestore will automatically detect the need for an index and provide a link in the console/logs. Click the link to create the index.

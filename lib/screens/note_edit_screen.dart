@@ -7,11 +7,13 @@ import '../services/notes_service.dart';
 class NoteEditScreen extends StatefulWidget {
   final Note? note;
   final String userId;
+  final String workspaceId;
 
   const NoteEditScreen({
     super.key,
     this.note,
     required this.userId,
+    required this.workspaceId,
   });
 
   @override
@@ -91,6 +93,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         content: content,
         createdAt: widget.note!.createdAt,
         userId: widget.userId,
+        workspaceId: widget.workspaceId,
       );
 
       await _notesService.updateNote(note);
@@ -169,6 +172,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         content: content,
         createdAt: widget.note?.createdAt ?? DateTime.now(),
         userId: widget.userId,
+        workspaceId: widget.workspaceId,
       );
 
       if (widget.note == null) {
@@ -202,7 +206,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 Expanded(
                   child: Text(
                     'Failed to save: ${e.toString()}',
-                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ],

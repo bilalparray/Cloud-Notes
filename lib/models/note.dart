@@ -6,6 +6,7 @@ class Note {
   final String content;
   final DateTime createdAt;
   final String userId;
+  final String workspaceId; // Added for workspace support
 
   Note({
     this.id,
@@ -13,6 +14,7 @@ class Note {
     required this.content,
     required this.createdAt,
     required this.userId,
+    required this.workspaceId,
   });
 
   factory Note.fromFirestore(DocumentSnapshot doc) {
@@ -23,6 +25,7 @@ class Note {
       content: data['content'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       userId: data['userId'] ?? '',
+      workspaceId: data['workspaceId'] ?? '',
     );
   }
 
@@ -32,6 +35,7 @@ class Note {
       'content': content,
       'createdAt': Timestamp.fromDate(createdAt),
       'userId': userId,
+      'workspaceId': workspaceId,
     };
   }
 
@@ -41,6 +45,7 @@ class Note {
     String? content,
     DateTime? createdAt,
     String? userId,
+    String? workspaceId,
   }) {
     return Note(
       id: id ?? this.id,
@@ -48,6 +53,7 @@ class Note {
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       userId: userId ?? this.userId,
+      workspaceId: workspaceId ?? this.workspaceId,
     );
   }
 }
