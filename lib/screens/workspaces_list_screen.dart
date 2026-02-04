@@ -454,54 +454,99 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
           final workspaces = snapshot.data ?? [];
 
           if (workspaces.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.workspaces_rounded,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'No workspaces yet',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Create your first workspace to get started',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            // Check if user has any owned workspaces by querying separately
+            // If they have no workspaces at all, they might be a new user or invited-only
+            // For now, show create option only if they're truly new (no workspaces)
+            // But we'll also check if they're an invited user by checking if they have any member workspaces
+            return StreamBuilder<List<Workspace>>(
+              stream: _workspaceService.getMemberWorkspaces(_currentUser!.uid),
+              builder: (context, memberSnapshot) {
+                final memberWorkspaces = memberSnapshot.data ?? [];
+                final isInvitedUser = memberWorkspaces.isNotEmpty;
+                
+                if (isInvitedUser) {
+                  // User is invited but workspaces list is empty (shouldn't happen, but handle it)
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.mail_outline_rounded,
+                            size: 64,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    FilledButton.icon(
-                      onPressed: _handleCreateWorkspace,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('Create Workspace'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No workspaces available',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'You haven\'t been invited to any workspaces yet',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  );
+                }
+                
+                // New user - show create option
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.workspaces_rounded,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        Text(
+                          'No workspaces yet',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Create your first workspace to get started',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: _handleCreateWorkspace,
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Create Workspace'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           }
 
@@ -635,11 +680,25 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _handleCreateWorkspace,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New Workspace'),
-        elevation: 4,
+      floatingActionButton: StreamBuilder<List<Workspace>>(
+        stream: _workspaceService.getWorkspacesStream(_currentUser!.uid),
+        builder: (context, snapshot) {
+          final workspaces = snapshot.data ?? [];
+          final hasOwnedWorkspaces = workspaces.any((w) => w.ownerId == _currentUser!.uid);
+          
+          // Only show create button if user owns at least one workspace
+          // This prevents invited-only users from creating workspaces
+          if (!hasOwnedWorkspaces) {
+            return const SizedBox.shrink();
+          }
+          
+          return FloatingActionButton.extended(
+            onPressed: _handleCreateWorkspace,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('New Workspace'),
+            elevation: 4,
+          );
+        },
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/workspace.dart';
 
@@ -5,25 +6,75 @@ class WorkspaceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _collectionName = 'workspaces';
 
+  // Get all workspaces where user is owner OR member
+  // Since Firestore doesn't support OR queries, we combine two streams
   Stream<List<Workspace>> getWorkspacesStream(String userId) {
-    return _firestore
+    // Get owned workspaces
+    final ownedStream = _firestore
         .collection(_collectionName)
         .where('ownerId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Workspace.fromFirestore(doc)).toList());
+
+    // Get workspaces where user is a member (not owner)
+    final memberStream = _firestore
+        .collection(_collectionName)
+        .where('members.$userId', isGreaterThan: '')
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Workspace.fromFirestore(doc)).toList());
+
+    // Combine both streams manually
+    final controller = StreamController<List<Workspace>>();
+    final ownedWorkspaces = <String, Workspace>{};
+    final memberWorkspaces = <String, Workspace>{};
+    StreamSubscription? ownedSub;
+    StreamSubscription? memberSub;
+
+    void emitCombined() {
+      // Merge both maps (member workspaces override owned if duplicate, which shouldn't happen)
+      final allWorkspaces = <String, Workspace>{...ownedWorkspaces, ...memberWorkspaces};
+      final result = allWorkspaces.values.toList();
+      result.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      controller.add(result);
+    }
+
+    ownedSub = ownedStream.listen((workspaces) {
+      ownedWorkspaces.clear();
+      for (final workspace in workspaces) {
+        if (workspace.id != null) {
+          ownedWorkspaces[workspace.id!] = workspace;
+        }
+      }
+      emitCombined();
+    }, onError: (error) {
+      controller.addError(error);
+    });
+
+    memberSub = memberStream.listen((workspaces) {
+      memberWorkspaces.clear();
+      for (final workspace in workspaces) {
+        if (workspace.id != null) {
+          memberWorkspaces[workspace.id!] = workspace;
+        }
+      }
+      emitCombined();
+    }, onError: (error) {
+      controller.addError(error);
+    });
+
+    controller.onCancel = () {
+      ownedSub?.cancel();
+      memberSub?.cancel();
+    };
+
+    return controller.stream;
   }
 
-  // Get all workspaces where user is owner or member
-  // Note: Firestore doesn't support OR queries, so we get owned workspaces
-  // and filter member workspaces in the app layer
+  // Get all workspaces where user is owner or member (alias for getWorkspacesStream)
   Stream<List<Workspace>> getWorkspacesForUser(String userId) {
-    return _firestore
-        .collection(_collectionName)
-        .where('ownerId', isEqualTo: userId)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Workspace.fromFirestore(doc)).toList());
+    return getWorkspacesStream(userId);
   }
 
   // Get workspaces where user is a member (not owner)

@@ -183,13 +183,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _checkInitialLink() async {
     if (kIsWeb) {
-      // Web: Check current URL
+      // Web: Check current URL - also check on every build
       final uri = Uri.base;
       if (uri.path.startsWith('/join/')) {
         final token = uri.path.split('/join/').last;
-        setState(() {
-          _pendingInvitationToken = token;
-        });
+        if (token.isNotEmpty && _pendingInvitationToken != token) {
+          setState(() {
+            _pendingInvitationToken = token;
+          });
+        }
       }
       return;
     }
@@ -227,6 +229,23 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    // Check URL on every build for web (in case user navigates to invitation link)
+    if (kIsWeb) {
+      final uri = Uri.base;
+      if (uri.path.startsWith('/join/')) {
+        final token = uri.path.split('/join/').last;
+        if (token.isNotEmpty && _pendingInvitationToken != token) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _pendingInvitationToken = token;
+              });
+            }
+          });
+        }
+      }
+    }
+
     return StreamBuilder<User?>(
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
