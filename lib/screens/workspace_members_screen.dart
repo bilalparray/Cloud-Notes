@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/workspace.dart';
 import '../models/invitation.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
 import '../services/invitation_service.dart';
-import 'package:flutter/services.dart';
 
 class WorkspaceMembersScreen extends StatefulWidget {
   final Workspace workspace;
@@ -153,6 +154,200 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
       if (mounted) {
         _showErrorSnackBar('Failed to remove member: $e');
       }
+    }
+  }
+
+  Future<void> _handleCreateInvitation(Workspace workspace) async {
+    if (!_isOwner || _currentUser == null) return;
+
+    // Show role selection
+    WorkspaceRole? selectedRole;
+    final roleResult = await showDialog<WorkspaceRole>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Create Invitation'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Select role for the new member:'),
+            const SizedBox(height: 16),
+            RadioListTile<WorkspaceRole>(
+              title: const Text('Editor'),
+              subtitle: const Text('Can create, edit, and delete notes'),
+              value: WorkspaceRole.editor,
+              groupValue: selectedRole,
+              onChanged: (value) {
+                selectedRole = value;
+                Navigator.of(context).pop(value);
+              },
+            ),
+            RadioListTile<WorkspaceRole>(
+              title: const Text('Viewer'),
+              subtitle: const Text('Can only view notes'),
+              value: WorkspaceRole.viewer,
+              groupValue: selectedRole,
+              onChanged: (value) {
+                selectedRole = value;
+                Navigator.of(context).pop(value);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (roleResult == null) return;
+    selectedRole = roleResult;
+
+    try {
+      final invitation = await _invitationService.createInvitation(
+        workspaceId: workspace.id!,
+        createdBy: _currentUser!.uid,
+        role: selectedRole!,
+      );
+
+      // Generate invitation link
+      String? baseUrl;
+      bool isDevelopment = true;
+      
+      if (kIsWeb) {
+        try {
+          final uri = Uri.base;
+          if (uri.hasScheme && 
+              uri.hasAuthority && 
+              (uri.scheme == 'http' || uri.scheme == 'https')) {
+            baseUrl = '${uri.scheme}://${uri.authority}';
+            if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
+              isDevelopment = true;
+            } else {
+              isDevelopment = false;
+            }
+          }
+        } catch (e) {
+          baseUrl = null;
+        }
+      }
+      
+      final link = _invitationService.generateInvitationLink(
+        invitation.token,
+        baseUrl: baseUrl,
+        isDevelopment: isDevelopment,
+      );
+
+      if (!link.startsWith('http://') && !link.startsWith('https://')) {
+        if (mounted) {
+          _showErrorSnackBar('Invalid URL format');
+        }
+        return;
+      }
+
+      // Show link dialog
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    'Invitation Created',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Share this link with your teammate:'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    link,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: link));
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context).pop();
+                  _showSuccessSnackBar('Link copied to clipboard');
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy Link'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to create invitation: $e');
+      }
+    }
+  }
+
+  Future<void> _handleCopyInvitationLink(Invitation invitation) async {
+    if (!_isOwner) return;
+
+    try {
+      String? baseUrl;
+      bool isDevelopment = true;
+      
+      if (kIsWeb) {
+        try {
+          final uri = Uri.base;
+          if (uri.hasScheme && 
+              uri.hasAuthority && 
+              (uri.scheme == 'http' || uri.scheme == 'https')) {
+            baseUrl = '${uri.scheme}://${uri.authority}';
+            if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
+              isDevelopment = true;
+            } else {
+              isDevelopment = false;
+            }
+          }
+        } catch (e) {
+          baseUrl = null;
+        }
+      }
+      
+      final link = _invitationService.generateInvitationLink(
+        invitation.token,
+        baseUrl: baseUrl,
+        isDevelopment: isDevelopment,
+      );
+
+      await Clipboard.setData(ClipboardData(text: link));
+      HapticFeedback.lightImpact();
+      _showSuccessSnackBar('Invitation link copied to clipboard');
+    } catch (e) {
+      _showErrorSnackBar('Failed to copy link: $e');
     }
   }
 
@@ -414,8 +609,16 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
                         : Theme.of(context).colorScheme.onTertiaryContainer,
                   ),
                 ),
-                title: Text(memberName),
-                subtitle: Text('${role.value.toUpperCase()} • ${userId.substring(0, 16)}...'),
+                title: Text(
+                  memberName,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                subtitle: Text(
+                  '${role.value.toUpperCase()} • ${userId.substring(0, 16)}...',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
                 trailing: PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   shape: RoundedRectangleBorder(
@@ -545,124 +748,171 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
 
         final invitations = snapshot.data ?? [];
 
-        if (invitations.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.mail_outline_rounded,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No invitations',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'All invitations will appear here',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
+        return Column(
+          children: [
+            // Invite button at the top
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: FilledButton.icon(
+                onPressed: () => _handleCreateInvitation(workspace),
+                icon: const Icon(Icons.person_add_rounded),
+                label: const Text('Create Invitation'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
               ),
             ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: invitations.length,
-          itemBuilder: (context, index) {
-            final invitation = invitations[index];
-            final role = WorkspaceRole.fromString(invitation.role);
-            final isExpired = invitation.expiresAt.isBefore(DateTime.now());
-            final isUsed = invitation.isUsed;
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isUsed
-                      ? Theme.of(context).colorScheme.surfaceContainerHighest
-                      : isExpired
-                          ? Theme.of(context).colorScheme.errorContainer
-                          : Theme.of(context).colorScheme.primaryContainer,
-                  child: Icon(
-                    isUsed
-                        ? Icons.check_circle_rounded
-                        : isExpired
-                            ? Icons.error_rounded
-                            : Icons.mail_rounded,
-                        color: isUsed
-                        ? Theme.of(context).colorScheme.onSurfaceVariant
-                        : isExpired
-                            ? Theme.of(context).colorScheme.onErrorContainer
-                            : Theme.of(context).colorScheme.onPrimaryContainer,
+            // Invitations list
+            if (invitations.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.mail_outline_rounded,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No invitations yet',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Create an invitation link to share with teammates',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                title: Text('${role.value.toUpperCase()} Invitation'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Token: ${invitation.token.substring(0, 16)}...'),
-                    const SizedBox(height: 4),
-                    Text(
-                      isUsed
-                          ? 'Used by ${invitation.usedBy?.substring(0, 8) ?? 'unknown'}...'
-                          : isExpired
-                              ? 'Expired ${_formatDate(invitation.expiresAt)}'
-                              : 'Expires ${_formatDate(invitation.expiresAt)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: invitations.length,
+                  itemBuilder: (context, index) {
+                    final invitation = invitations[index];
+                    final role = WorkspaceRole.fromString(invitation.role);
+                    final isExpired = invitation.expiresAt.isBefore(DateTime.now());
+                    final isUsed = invitation.isUsed;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isUsed
+                              ? Theme.of(context).colorScheme.surfaceContainerHighest
+                              : isExpired
+                                  ? Theme.of(context).colorScheme.errorContainer
+                                  : Theme.of(context).colorScheme.primaryContainer,
+                          child: Icon(
+                            isUsed
+                                ? Icons.check_circle_rounded
+                                : isExpired
+                                    ? Icons.error_rounded
+                                    : Icons.mail_rounded,
+                            color: isUsed
+                                ? Theme.of(context).colorScheme.onSurfaceVariant
+                                : isExpired
+                                    ? Theme.of(context).colorScheme.onErrorContainer
+                                    : Theme.of(context).colorScheme.onPrimaryContainer,
                           ),
-                    ),
-                  ],
-                ),
-                trailing: isUsed || isExpired
-                    ? null
-                    : PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.delete_rounded,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                ),
-                              ],
+                        title: Text('${role.value.toUpperCase()} Invitation'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Token: ${invitation.token.substring(0, 16)}...',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              softWrap: false,
                             ),
-                          ),
-                        ],
-                        onSelected: (value) {
-                          if (value == 'delete') {
-                            _handleDeleteInvitation(invitation.id!);
-                          }
-                        },
+                            const SizedBox(height: 4),
+                            Text(
+                              isUsed
+                                  ? 'Used by ${invitation.usedBy?.substring(0, 8) ?? 'unknown'}...'
+                                  : isExpired
+                                      ? 'Expired ${_formatDate(invitation.expiresAt)}'
+                                      : 'Expires ${_formatDate(invitation.expiresAt)}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true,
+                        trailing: isUsed || isExpired
+                            ? null
+                            : PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'copy_link',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.link_rounded,
+                                          size: 20,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text('Copy Link'),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete_rounded,
+                                          size: 20,
+                                          color: Theme.of(context).colorScheme.error,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.error,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onSelected: (value) {
+                                  if (value == 'copy_link') {
+                                    _handleCopyInvitationLink(invitation);
+                                  } else if (value == 'delete') {
+                                    _handleDeleteInvitation(invitation.id!);
+                                  }
+                                },
+                              ),
                       ),
-                isThreeLine: true,
+                    );
+                  },
+                ),
               ),
-            );
-          },
+          ],
         );
+
       },
     );
   }

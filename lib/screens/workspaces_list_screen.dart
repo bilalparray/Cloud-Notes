@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/workspace.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
-import '../services/invitation_service.dart';
 import 'workspace_notes_screen.dart';
 
 class WorkspacesListScreen extends StatefulWidget {
@@ -17,7 +14,6 @@ class WorkspacesListScreen extends StatefulWidget {
 
 class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
   final WorkspaceService _workspaceService = WorkspaceService();
-  final InvitationService _invitationService = InvitationService();
   final AuthService _authService = AuthService();
   User? _currentUser;
 
@@ -104,163 +100,6 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
     }
   }
 
-  Future<void> _handleInviteTeammate(Workspace workspace) async {
-    if (_currentUser == null) return;
-    if (workspace.ownerId != _currentUser!.uid) {
-      _showErrorSnackBar('Only workspace owners can invite members');
-      return;
-    }
-
-    // Show role selection
-    WorkspaceRole? selectedRole;
-    final roleResult = await showDialog<WorkspaceRole>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Invite Teammate'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Select role for the new member:'),
-            const SizedBox(height: 16),
-            RadioListTile<WorkspaceRole>(
-              title: const Text('Editor'),
-              subtitle: const Text('Can create, edit, and delete notes'),
-              value: WorkspaceRole.editor,
-              groupValue: selectedRole,
-              onChanged: (value) {
-                selectedRole = value;
-                Navigator.of(context).pop(value);
-              },
-            ),
-            RadioListTile<WorkspaceRole>(
-              title: const Text('Viewer'),
-              subtitle: const Text('Can only view notes'),
-              value: WorkspaceRole.viewer,
-              groupValue: selectedRole,
-              onChanged: (value) {
-                selectedRole = value;
-                Navigator.of(context).pop(value);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    if (roleResult == null) return;
-    selectedRole = roleResult;
-
-    try {
-      final invitation = await _invitationService.createInvitation(
-        workspaceId: workspace.id!,
-        createdBy: _currentUser!.uid,
-        role: selectedRole!,
-      );
-
-      // Generate invitation link - handle web and mobile differently
-      String? baseUrl;
-      bool isDevelopment = true; // Set to false for production
-      
-      if (kIsWeb) {
-        try {
-          final uri = Uri.base;
-          // Only use HTTP/HTTPS schemes, ignore file:// or other schemes
-          if (uri.hasScheme && 
-              uri.hasAuthority && 
-              (uri.scheme == 'http' || uri.scheme == 'https')) {
-            baseUrl = '${uri.scheme}://${uri.authority}';
-            // If using localhost, it's development
-            if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
-              isDevelopment = true;
-            } else {
-              isDevelopment = false;
-            }
-          }
-        } catch (e) {
-          // If Uri.base fails, use default
-          baseUrl = null;
-        }
-      }
-      
-      final link = _invitationService.generateInvitationLink(
-        invitation.token,
-        baseUrl: baseUrl,
-        isDevelopment: isDevelopment,
-      );
-      
-      // Validate the link is a proper HTTP/HTTPS URL before showing
-      if (!link.startsWith('http://') && !link.startsWith('https://')) {
-        if (mounted) {
-          _showErrorSnackBar(
-            'Invalid URL format. Please configure your app domain in invitation_service.dart'
-          );
-        }
-        return;
-      }
-
-      if (mounted) {
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.link, color: Colors.blue),
-                SizedBox(width: 12),
-                Text('Invitation Link'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Share this link with your teammate:'),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    link,
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-              FilledButton.icon(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: link));
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop();
-                  _showSuccessSnackBar('Link copied to clipboard');
-                },
-                icon: const Icon(Icons.copy),
-                label: const Text('Copy Link'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar('Failed to create invitation: $e');
-      }
-    }
-  }
 
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
@@ -662,13 +501,7 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
                                   ),
                             ),
                             const Spacer(),
-                            if (isOwner)
-                              IconButton(
-                                icon: const Icon(Icons.person_add_rounded),
-                                onPressed: () => _handleInviteTeammate(workspace),
-                                tooltip: 'Invite teammate',
-                                iconSize: 20,
-                              ),
+                            // Removed invite button - invitations are now managed in WorkspaceMembersScreen
                           ],
                         ),
                       ],
