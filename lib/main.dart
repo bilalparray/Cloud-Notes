@@ -67,11 +67,11 @@ class CloudNotesApp extends StatelessWidget {
           ),
           filled: true,
         ),
-        appBarTheme: AppBarTheme(
+        appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
-          backgroundColor: const Color(0xFFFFFBFE),
-          foregroundColor: const Color(0xFF1E1B4B),
+          backgroundColor: Color(0xFFFFFBFE),
+          foregroundColor: Color(0xFF1E1B4B),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 4,
