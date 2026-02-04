@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/workspace.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
@@ -163,10 +164,37 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
         role: selectedRole!,
       );
 
+      // Generate invitation link - handle web and mobile differently
+      String? baseUrl;
+      if (kIsWeb) {
+        try {
+          final uri = Uri.base;
+          // Only use HTTP/HTTPS schemes, ignore file:// or other schemes
+          if (uri.hasScheme && 
+              uri.hasAuthority && 
+              (uri.scheme == 'http' || uri.scheme == 'https')) {
+            baseUrl = '${uri.scheme}://${uri.authority}';
+          }
+        } catch (e) {
+          // If Uri.base fails, use default
+          baseUrl = null;
+        }
+      }
+      
       final link = _invitationService.generateInvitationLink(
         invitation.token,
-        baseUrl: Uri.base.origin,
+        baseUrl: baseUrl,
       );
+      
+      // Validate the link is a proper HTTP/HTTPS URL before showing
+      if (!link.startsWith('http://') && !link.startsWith('https://')) {
+        if (mounted) {
+          _showErrorSnackBar(
+            'Invalid URL format. Please configure your app domain in invitation_service.dart'
+          );
+        }
+        return;
+      }
 
       if (mounted) {
         await showDialog(

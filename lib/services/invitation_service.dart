@@ -103,11 +103,20 @@ class InvitationService {
   }
 
   String generateInvitationLink(String token, {String? baseUrl}) {
-    // For web, use the current origin
-    if (baseUrl != null) {
-      return '$baseUrl/join/$token';
+    // For web, use the current origin if valid
+    if (baseUrl != null && 
+        baseUrl.isNotEmpty && 
+        (baseUrl.startsWith('http://') || baseUrl.startsWith('https://'))) {
+      // Ensure no trailing slash
+      final cleanUrl = baseUrl.endsWith('/') 
+          ? baseUrl.substring(0, baseUrl.length - 1) 
+          : baseUrl;
+      return '$cleanUrl/join/$token';
     }
-    // Default to localhost for development
-    return 'http://localhost:5501/join/$token';
+    
+    // For mobile or invalid baseUrl, show a message that user needs to configure
+    // In production, you should set your actual domain here
+    // For now, return a placeholder that indicates configuration needed
+    return 'https://your-app-domain.com/join/$token';
   }
 }
