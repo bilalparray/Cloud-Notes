@@ -410,13 +410,18 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
               : StreamBuilder<List<Note>>(
                   stream: _notesService.getNotesStream(workspace.id!),
                   builder: (context, snapshot) {
-                    // Show loading only on initial load
+                    // Show loading only when truly waiting for initial data
+                    // Once stream is active or done, proceed (even if empty list)
+                    // This prevents infinite loader when new space has 0 notes
                     if (snapshot.connectionState == ConnectionState.waiting &&
                         !snapshot.hasData) {
                       return const Center(
                         child: CircularProgressIndicator(),
                       );
                     }
+
+                    // Once stream is active or done, proceed with data (or empty list)
+                    // This ensures we don't show loader indefinitely for new spaces
 
                     if (snapshot.hasError) {
                       return Center(
