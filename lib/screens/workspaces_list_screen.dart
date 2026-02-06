@@ -216,9 +216,24 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 1,
-        title: const Text(
-          'My Workspaces',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'My Workspaces',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            if (_authService.isDemoMode)
+              Text(
+                'Demo Mode',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+          ],
         ),
         actions: [
           PopupMenuButton<String>(
