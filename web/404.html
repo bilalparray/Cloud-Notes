@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cloud Notes</title>
+    <script>
+        // GitHub Pages 404.html for root directory
+        // This handles invitation links at root level (e.g., /join/token)
+        // and redirects them to /cloudnotes/join/token
+
+        var path = window.location.pathname;
+
+        if (path.startsWith('/join/')) {
+            // Handle invitation links at root level - redirect to cloudnotes
+            window.location.replace('/cloudnotes' + path);
+        } else if (path.startsWith('/cloudnotes/')) {
+            // If somehow we get here for cloudnotes paths, redirect to cloudnotes index
+            window.location.replace('/cloudnotes/index.html');
+        } else {
+            // For other paths, redirect to cloudnotes
+            window.location.replace('/cloudnotes/index.html');
+        }
+    </script>
+</head>
+
+<body>
+    <p>Redirecting...</p>
+</body>
+
+</html>

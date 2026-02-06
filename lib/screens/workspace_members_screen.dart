@@ -223,7 +223,13 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
           if (uri.hasScheme && 
               uri.hasAuthority && 
               (uri.scheme == 'http' || uri.scheme == 'https')) {
-            baseUrl = '${uri.scheme}://${uri.authority}';
+            // Include the full path (including /cloudnotes) for subdirectory deployment
+            String path = uri.path;
+            // Remove trailing slash if present
+            if (path.endsWith('/') && path.length > 1) {
+              path = path.substring(0, path.length - 1);
+            }
+            baseUrl = '${uri.scheme}://${uri.authority}$path';
             if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
               isDevelopment = true;
             } else {
@@ -325,7 +331,13 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
           if (uri.hasScheme && 
               uri.hasAuthority && 
               (uri.scheme == 'http' || uri.scheme == 'https')) {
-            baseUrl = '${uri.scheme}://${uri.authority}';
+            // Include the full path (including /cloudnotes) for subdirectory deployment
+            String path = uri.path;
+            // Remove trailing slash if present
+            if (path.endsWith('/') && path.length > 1) {
+              path = path.substring(0, path.length - 1);
+            }
+            baseUrl = '${uri.scheme}://${uri.authority}$path';
             if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
               isDevelopment = true;
             } else {
