@@ -50,6 +50,10 @@ web/firebase-config.js
 .env
 .env.local
 
+# Android Keystore (DO NOT COMMIT!)
+android/keystore.jks
+android/key.properties
+
 # Web
 /web/favicon.png
 /web/icons/
