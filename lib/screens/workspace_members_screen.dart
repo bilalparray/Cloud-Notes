@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/workspace.dart';
-import '../models/invitation.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
-import '../services/invitation_service.dart';
 
 class WorkspaceMembersScreen extends StatefulWidget {
   final Workspace workspace;
@@ -22,7 +19,6 @@ class WorkspaceMembersScreen extends StatefulWidget {
 
 class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
   final WorkspaceService _workspaceService = WorkspaceService();
-  final InvitationService _invitationService = InvitationService();
   final AuthService _authService = AuthService();
   User? _currentUser;
   Workspace? _currentWorkspace;
@@ -157,259 +153,17 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
     }
   }
 
-  Future<void> _handleCreateInvitation(Workspace workspace) async {
-    if (!_isOwner || _currentUser == null) return;
-
-    // Show role selection
-    WorkspaceRole? selectedRole;
-    final roleResult = await showDialog<WorkspaceRole>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Create Invitation'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Select role for the new member:'),
-            const SizedBox(height: 16),
-            RadioListTile<WorkspaceRole>(
-              title: const Text('Editor'),
-              subtitle: const Text('Can create, edit, and delete notes'),
-              value: WorkspaceRole.editor,
-              groupValue: selectedRole,
-              onChanged: (value) {
-                selectedRole = value;
-                Navigator.of(context).pop(value);
-              },
-            ),
-            RadioListTile<WorkspaceRole>(
-              title: const Text('Viewer'),
-              subtitle: const Text('Can only view notes'),
-              value: WorkspaceRole.viewer,
-              groupValue: selectedRole,
-              onChanged: (value) {
-                selectedRole = value;
-                Navigator.of(context).pop(value);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    if (roleResult == null) return;
-    selectedRole = roleResult;
-
+  Future<void> _handleUpdateInviteSettings(Workspace workspace, bool inviteEnabled, String? inviteRole) async {
+    if (workspace.id == null) return;
     try {
-      final invitation = await _invitationService.createInvitation(
+      await _workspaceService.updateWorkspaceInvite(
         workspaceId: workspace.id!,
-        createdBy: _currentUser!.uid,
-        role: selectedRole!,
+        inviteEnabled: inviteEnabled,
+        inviteRole: inviteRole,
       );
-
-      // Generate invitation link
-      String? baseUrl;
-      bool isDevelopment = true;
-      
-      if (kIsWeb) {
-        try {
-          final uri = Uri.base;
-          if (uri.hasScheme && 
-              uri.hasAuthority && 
-              (uri.scheme == 'http' || uri.scheme == 'https')) {
-            // Include the full path (including /cloudnotes) for subdirectory deployment
-            String path = uri.path;
-            // Remove trailing slash if present
-            if (path.endsWith('/') && path.length > 1) {
-              path = path.substring(0, path.length - 1);
-            }
-            baseUrl = '${uri.scheme}://${uri.authority}$path';
-            if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
-              isDevelopment = true;
-            } else {
-              isDevelopment = false;
-            }
-          }
-        } catch (e) {
-          baseUrl = null;
-        }
-      }
-      
-      final link = _invitationService.generateInvitationLink(
-        invitation.token,
-        baseUrl: baseUrl,
-        isDevelopment: isDevelopment,
-      );
-
-      if (!link.startsWith('http://') && !link.startsWith('https://')) {
-        if (mounted) {
-          _showErrorSnackBar('Invalid URL format');
-        }
-        return;
-      }
-
-      // Show link dialog
-      if (mounted) {
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                    'Invitation Created',
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Share this link with your teammate:'),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    link,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-              FilledButton.icon(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: link));
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop();
-                  _showSuccessSnackBar('Link copied to clipboard');
-                },
-                icon: const Icon(Icons.copy),
-                label: const Text('Copy Link'),
-              ),
-            ],
-          ),
-        );
-      }
+      if (mounted) _showSuccessSnackBar(inviteEnabled ? 'Invite enabled' : 'Invite disabled');
     } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar('Failed to create invitation: $e');
-      }
-    }
-  }
-
-  Future<void> _handleCopyInvitationLink(Invitation invitation) async {
-    if (!_isOwner) return;
-
-    try {
-      String? baseUrl;
-      bool isDevelopment = true;
-      
-      if (kIsWeb) {
-        try {
-          final uri = Uri.base;
-          if (uri.hasScheme && 
-              uri.hasAuthority && 
-              (uri.scheme == 'http' || uri.scheme == 'https')) {
-            // Include the full path (including /cloudnotes) for subdirectory deployment
-            String path = uri.path;
-            // Remove trailing slash if present
-            if (path.endsWith('/') && path.length > 1) {
-              path = path.substring(0, path.length - 1);
-            }
-            baseUrl = '${uri.scheme}://${uri.authority}$path';
-            if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
-              isDevelopment = true;
-            } else {
-              isDevelopment = false;
-            }
-          }
-        } catch (e) {
-          baseUrl = null;
-        }
-      }
-      
-      final link = _invitationService.generateInvitationLink(
-        invitation.token,
-        baseUrl: baseUrl,
-        isDevelopment: isDevelopment,
-      );
-
-      await Clipboard.setData(ClipboardData(text: link));
-      HapticFeedback.lightImpact();
-      _showSuccessSnackBar('Invitation link copied to clipboard');
-    } catch (e) {
-      _showErrorSnackBar('Failed to copy link: $e');
-    }
-  }
-
-  Future<void> _handleDeleteInvitation(String invitationId) async {
-    if (!_isOwner) return;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(
-              Icons.delete_rounded,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(width: 12),
-            const Text('Delete Invitation'),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to delete this invitation? It will no longer be usable.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      await _invitationService.deleteInvitation(invitationId);
-      if (mounted) {
-        _showSuccessSnackBar('Invitation deleted successfully');
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar('Failed to delete invitation: $e');
-      }
+      if (mounted) _showErrorSnackBar(e.toString());
     }
   }
 
@@ -500,25 +254,9 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
           });
         }
 
-        return DefaultTabController(
-          length: 2,
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Workspace Members'),
-              bottom: TabBar(
-                tabs: const [
-                  Tab(icon: Icon(Icons.people_rounded), text: 'Members'),
-                  Tab(icon: Icon(Icons.mail_rounded), text: 'Invitations'),
-                ],
-              ),
-            ),
-            body: TabBarView(
-              children: [
-                _buildMembersTab(workspace),
-                _buildInvitationsTab(workspace),
-              ],
-            ),
-          ),
+        return Scaffold(
+          appBar: AppBar(title: const Text('Workspace Members')),
+          body: _buildMembersTab(workspace),
         );
       },
     );
@@ -530,7 +268,8 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Owner section
+        if (_isOwner && workspace.id != null) _buildShareWorkspaceCard(workspace),
+        if (_isOwner && workspace.id != null) const SizedBox(height: 16),
         StreamBuilder<User?>(
           stream: _authService.authStateChanges,
           builder: (context, authSnapshot) {
@@ -687,245 +426,111 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
     );
   }
 
-  Widget _buildInvitationsTab(Workspace workspace) {
-    if (workspace.id == null) {
-      return const Center(child: Text('Invalid workspace'));
-    }
-
-    return StreamBuilder<List<Invitation>>(
-      stream: _invitationService.getInvitationsForWorkspace(workspace.id!),
-      builder: (context, snapshot) {
-        // Show loading only on initial load
-        if (snapshot.connectionState == ConnectionState.waiting && 
-            !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline_rounded,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error loading invitations',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    snapshot.error.toString(),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  // Check if it's a missing index error
-                  if (snapshot.error.toString().contains('index') ||
-                      snapshot.error.toString().contains('requires an index'))
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Missing Firestore Index',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'You need to create a composite index in Firebase Console.',
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Collection: invitations\nFields: workspaceId (Ascending), createdAt (Descending)',
-                              style: TextStyle(fontFamily: 'monospace', fontSize: 12),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final invitations = snapshot.data ?? [];
-
-        return Column(
+  Widget _buildShareWorkspaceCard(Workspace workspace) {
+    final inviteRole = workspace.inviteRole ?? 'viewer';
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Invite button at the top
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: FilledButton.icon(
-                onPressed: () => _handleCreateInvitation(workspace),
-                icon: const Icon(Icons.person_add_rounded),
-                label: const Text('Create Invitation'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
+            Row(
+              children: [
+                Icon(Icons.share_rounded, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Share workspace',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
-              ),
+              ],
             ),
-            // Invitations list
-            if (invitations.isEmpty)
-              Expanded(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.mail_outline_rounded,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No invitations yet',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Create an invitation link to share with teammates',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+            const SizedBox(height: 12),
+            Text(
+              'Allow others to join with the invite code. Set the role they will get.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: inviteRole == 'editor' ? 'editor' : 'viewer',
+                    decoration: const InputDecoration(
+                      labelText: 'Role for new members',
+                      isDense: true,
+                      border: OutlineInputBorder(),
                     ),
+                    items: const [
+                      DropdownMenuItem(value: 'editor', child: Text('Editor')),
+                      DropdownMenuItem(value: 'viewer', child: Text('Viewer')),
+                    ],
+                    onChanged: (value) async {
+                      if (value == null) return;
+                      await _handleUpdateInviteSettings(workspace, workspace.inviteEnabled, value);
+                      if (mounted) setState(() {});
+                    },
                   ),
                 ),
-              )
-            else
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: invitations.length,
-                  itemBuilder: (context, index) {
-                    final invitation = invitations[index];
-                    final role = WorkspaceRole.fromString(invitation.role);
-                    final isExpired = invitation.expiresAt.isBefore(DateTime.now());
-                    final isUsed = invitation.isUsed;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isUsed
-                              ? Theme.of(context).colorScheme.surfaceContainerHighest
-                              : isExpired
-                                  ? Theme.of(context).colorScheme.errorContainer
-                                  : Theme.of(context).colorScheme.primaryContainer,
-                          child: Icon(
-                            isUsed
-                                ? Icons.check_circle_rounded
-                                : isExpired
-                                    ? Icons.error_rounded
-                                    : Icons.mail_rounded,
-                            color: isUsed
-                                ? Theme.of(context).colorScheme.onSurfaceVariant
-                                : isExpired
-                                    ? Theme.of(context).colorScheme.onErrorContainer
-                                    : Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        title: Text('${role.value.toUpperCase()} Invitation'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Token: ${invitation.token.substring(0, 16)}...',
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              softWrap: false,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              isUsed
-                                  ? 'Used by ${invitation.usedBy?.substring(0, 8) ?? 'unknown'}...'
-                                  : isExpired
-                                      ? 'Expired ${_formatDate(invitation.expiresAt)}'
-                                      : 'Expires ${_formatDate(invitation.expiresAt)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              softWrap: false,
-                            ),
-                          ],
-                        ),
-                        isThreeLine: true,
-                        trailing: isUsed || isExpired
-                            ? null
-                            : PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'copy_link',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.link_rounded,
-                                          size: 20,
-                                          color: Theme.of(context).colorScheme.primary,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        const Text('Copy Link'),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.delete_rounded,
-                                          size: 20,
-                                          color: Theme.of(context).colorScheme.error,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Delete',
-                                          style: TextStyle(
-                                            color: Theme.of(context).colorScheme.error,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                onSelected: (value) {
-                                  if (value == 'copy_link') {
-                                    _handleCopyInvitationLink(invitation);
-                                  } else if (value == 'delete') {
-                                    _handleDeleteInvitation(invitation.id!);
-                                  }
-                                },
-                              ),
-                      ),
-                    );
+                const SizedBox(width: 16),
+                Text('Allow join', style: Theme.of(context).textTheme.bodyMedium),
+                Switch(
+                  value: workspace.inviteEnabled,
+                  onChanged: (v) async {
+                    await _handleUpdateInviteSettings(workspace, v, workspace.inviteRole ?? inviteRole);
+                    if (mounted) setState(() {});
                   },
                 ),
+              ],
+            ),
+            if (workspace.inviteEnabled) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SelectableText(
+                        workspace.id!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: workspace.id!));
+                      HapticFeedback.lightImpact();
+                      _showSuccessSnackBar('Invite code copied');
+                    },
+                    icon: const Icon(Icons.copy_rounded),
+                  ),
+                ],
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Share this code. Others enter it in "Join a workspace" and tap Accept.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
           ],
-        );
-
-      },
+        ),
+      ),
     );
   }
 
@@ -981,20 +586,4 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = date.difference(now);
-
-    if (difference.inDays > 0) {
-      return 'in ${difference.inDays} days';
-    } else if (difference.inDays < 0) {
-      return '${difference.inDays.abs()} days ago';
-    } else if (difference.inHours > 0) {
-      return 'in ${difference.inHours} hours';
-    } else if (difference.inHours < 0) {
-      return '${difference.inHours.abs()} hours ago';
-    } else {
-      return 'soon';
-    }
-  }
 }

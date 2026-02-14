@@ -23,6 +23,8 @@ class Workspace {
   final DateTime updatedAt;
   final Map<String, String> members; // userId -> role
   final Map<String, String> memberNames; // userId -> displayName
+  final bool inviteEnabled;
+  final String? inviteRole; // 'editor' | 'viewer' when invite is enabled
 
   Workspace({
     this.id,
@@ -33,6 +35,8 @@ class Workspace {
     required this.updatedAt,
     required this.members,
     Map<String, String>? memberNames,
+    this.inviteEnabled = false,
+    this.inviteRole,
   }) : memberNames = memberNames ?? {};
 
   factory Workspace.fromFirestore(DocumentSnapshot doc) {
@@ -46,11 +50,13 @@ class Workspace {
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
       members: Map<String, String>.from(data['members'] ?? {}),
       memberNames: Map<String, String>.from(data['memberNames'] ?? {}),
+      inviteEnabled: data['inviteEnabled'] == true,
+      inviteRole: data['inviteRole'] as String?,
     );
   }
 
   Map<String, dynamic> toFirestore() {
-    return {
+    final map = <String, dynamic>{
       'name': name,
       'description': description,
       'ownerId': ownerId,
@@ -59,6 +65,9 @@ class Workspace {
       'members': members,
       'memberNames': memberNames,
     };
+    if (inviteRole != null) map['inviteRole'] = inviteRole;
+    map['inviteEnabled'] = inviteEnabled;
+    return map;
   }
 
   WorkspaceRole getRoleForUser(String userId) {
@@ -86,6 +95,8 @@ class Workspace {
     DateTime? updatedAt,
     Map<String, String>? members,
     Map<String, String>? memberNames,
+    bool? inviteEnabled,
+    String? inviteRole,
   }) {
     return Workspace(
       id: id ?? this.id,
@@ -96,6 +107,8 @@ class Workspace {
       updatedAt: updatedAt ?? this.updatedAt,
       members: members ?? this.members,
       memberNames: memberNames ?? this.memberNames,
+      inviteEnabled: inviteEnabled ?? this.inviteEnabled,
+      inviteRole: inviteRole ?? this.inviteRole,
     );
   }
   

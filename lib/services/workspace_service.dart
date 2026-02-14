@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/workspace.dart';
 
 class WorkspaceService {
@@ -232,7 +233,6 @@ class WorkspaceService {
     }
   }
 
-  // Stream to listen for workspace updates in real-time
   Stream<Workspace?> getWorkspaceStream(String workspaceId) {
     return _firestore
         .collection(_collectionName)
@@ -242,5 +242,33 @@ class WorkspaceService {
       if (!doc.exists) return null;
       return Workspace.fromFirestore(doc);
     });
+  }
+
+  /// Update only invite settings (owner sets role and enables/disables invite).
+  Future<void> updateWorkspaceInvite({
+    required String workspaceId,
+    required bool inviteEnabled,
+    required String? inviteRole,
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'inviteEnabled': inviteEnabled,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      };
+      if (inviteRole != null) updates['inviteRole'] = inviteRole;
+      await _firestore.collection(_collectionName).doc(workspaceId).update(updates);
+    } catch (e) {
+      throw Exception('Failed to update invite settings: $e');
+    }
+  }
+
+  /// Accept workspace invite by code (workspace ID). Calls Cloud Function.
+  Future<void> acceptInviteByCode(String workspaceId) async {
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('acceptInvite')
+        .call(<String, dynamic>{'workspaceId': workspaceId.trim()});
+    if (result.data is Map && (result.data as Map)['success'] != true) {
+      throw Exception((result.data as Map)['message']?.toString() ?? 'Failed to join');
+    }
   }
 }

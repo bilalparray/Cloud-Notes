@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/workspace.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
@@ -100,6 +101,37 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
     }
   }
 
+
+  final _inviteCodeController = TextEditingController();
+  bool _acceptingInvite = false;
+
+  @override
+  void dispose() {
+    _inviteCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleAcceptInvite() async {
+    final code = _inviteCodeController.text.trim();
+    if (code.isEmpty) {
+      _showErrorSnackBar('Enter an invite code');
+      return;
+    }
+    setState(() => _acceptingInvite = true);
+    try {
+      await _workspaceService.acceptInviteByCode(code);
+      if (mounted) {
+        _inviteCodeController.clear();
+        _showSuccessSnackBar('Joined workspace');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) _showErrorSnackBar(e.message ?? e.code);
+    } catch (e) {
+      if (mounted) _showErrorSnackBar(e.toString());
+    } finally {
+      if (mounted) setState(() => _acceptingInvite = false);
+    }
+  }
 
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
@@ -307,246 +339,240 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
 
           final workspaces = snapshot.data ?? [];
 
-          if (workspaces.isEmpty) {
-            // Check if user has any owned workspaces by querying separately
-            // If they have no workspaces at all, they might be a new user or invited-only
-            // For now, show create option only if they're truly new (no workspaces)
-            // But we'll also check if they're an invited user by checking if they have any member workspaces
-            return StreamBuilder<List<Workspace>>(
-              stream: _workspaceService.getMemberWorkspaces(_currentUser!.uid),
-              builder: (context, memberSnapshot) {
-                final memberWorkspaces = memberSnapshot.data ?? [];
-                final isInvitedUser = memberWorkspaces.isNotEmpty;
-                
-                if (isInvitedUser) {
-                  // User is invited but workspaces list is empty (shouldn't happen, but handle it)
-                  return Center(
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                      ),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(32.0),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Join a workspace',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _inviteCodeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Invite code',
+                              hintText: 'Paste the code shared by the owner',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            textCapitalization: TextCapitalization.none,
+                            autocorrect: false,
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: _acceptingInvite ? null : _handleAcceptInvite,
+                              icon: _acceptingInvite
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.login_rounded, size: 20),
+                              label: Text(_acceptingInvite ? 'Accepting...' : 'Accept'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (workspaces.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.mail_outline_rounded,
+                            Icons.workspaces_rounded,
                             size: 64,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'No workspaces available',
+                            'No workspaces yet',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'You haven\'t been invited to any workspaces yet',
+                            'Create one or use an invite code above to join.',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                             textAlign: TextAlign.center,
                           ),
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: _handleCreateWorkspace,
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Create Workspace'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  );
-                }
-                
-                // New user - show create option
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.workspaces_rounded,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        Text(
-                          'No workspaces yet',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Create your first workspace to get started',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 32),
-                        FilledButton.icon(
-                          onPressed: _handleCreateWorkspace,
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Create Workspace'),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                );
-              },
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: workspaces.length,
-            itemBuilder: (context, index) {
-              final workspace = workspaces[index];
-              final isOwner = workspace.ownerId == _currentUser!.uid;
-              final role = workspace.getRoleForUser(_currentUser!.uid);
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-                    width: 1,
-                  ),
-                ),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => WorkspaceNotesScreen(workspace: workspace),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    workspace.name,
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  if (workspace.description.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      workspace.description,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                          ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            if (isOwner)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Owner',
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  role.value.toUpperCase(),
-                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSecondaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.people_rounded,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${workspace.members.length + 1} member${workspace.members.length + 1 == 1 ? '' : 's'}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                            const Spacer(),
-                            // Removed invite button - invitations are now managed in WorkspaceMembersScreen
-                          ],
-                        ),
-                      ],
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final workspace = workspaces[index];
+                        return _buildWorkspaceCard(context, workspace);
+                      },
+                      childCount: workspaces.length,
                     ),
                   ),
                 ),
-              );
-            },
+            ],
           );
         },
       ),
-      floatingActionButton: StreamBuilder<List<Workspace>>(
-        stream: _workspaceService.getWorkspacesStream(_currentUser!.uid),
-        builder: (context, snapshot) {
-          final workspaces = snapshot.data ?? [];
-          final hasOwnedWorkspaces = workspaces.any((w) => w.ownerId == _currentUser!.uid);
-          
-          // Only show create button if user owns at least one workspace
-          // This prevents invited-only users from creating workspaces
-          if (!hasOwnedWorkspaces) {
-            return const SizedBox.shrink();
-          }
-          
-          return FloatingActionButton.extended(
-            onPressed: _handleCreateWorkspace,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('New Workspace'),
-            elevation: 4,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _handleCreateWorkspace,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New Workspace'),
+        elevation: 4,
+      ),
+    );
+  }
+
+  Widget _buildWorkspaceCard(BuildContext context, Workspace workspace) {
+    final isOwner = workspace.ownerId == _currentUser!.uid;
+    final role = workspace.getRoleForUser(_currentUser!.uid);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => WorkspaceNotesScreen(workspace: workspace),
+            ),
           );
         },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          workspace.name,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        if (workspace.description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            workspace.description,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (isOwner)
+                    _badge(context, 'Owner', Theme.of(context).colorScheme.primaryContainer)
+                  else
+                    _badge(context, 'Invited', Theme.of(context).colorScheme.secondaryContainer),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.people_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${workspace.members.length + 1} member${workspace.members.length + 1 == 1 ? '' : 's'}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  if (!isOwner) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '• ${role.value}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _badge(BuildContext context, String label, Color bgColor) {
+    final isPrimary = bgColor == Theme.of(context).colorScheme.primaryContainer;
+    final textColor = isPrimary
+        ? Theme.of(context).colorScheme.onPrimaryContainer
+        : Theme.of(context).colorScheme.onSecondaryContainer;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.bold,
+            ),
       ),
     );
   }
