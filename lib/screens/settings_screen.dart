@@ -168,9 +168,17 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
-    if (confirm == true && context.mounted) {
+    if (confirm != true || !context.mounted) return;
+    try {
       await AuthService().signOut();
-      // AuthWrapper will show LoginScreen when auth state changes
+      // Pop back to root so user sees LoginScreen (AuthWrapper rebuilds to show it)
+      if (context.mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showSnackBar(context, 'Log out failed: $e');
+      }
     }
   }
 }
