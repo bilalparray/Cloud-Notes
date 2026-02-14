@@ -104,26 +104,38 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
   }
 
 
-  /// Returns true if join succeeded, false otherwise.
-  Future<bool> _handleAcceptInvite(String code) async {
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> _handleAcceptInvite(String code) async {
     if (code.isEmpty) {
-      _showErrorSnackBar('Enter an invite code');
-      return false;
+      return 'Enter an invite code';
     }
     try {
       await _workspaceService.acceptInviteByCode(code);
-      if (mounted) {
-        _showSuccessSnackBar('Joined workspace');
-        return true;
-      }
-      return false;
+      if (mounted) _showSuccessSnackBar('Joined workspace');
+      return null;
     } on FirebaseFunctionsException catch (e) {
-      if (mounted) _showErrorSnackBar(e.message ?? e.code);
-      return false;
+      return _userFriendlyInviteError(e);
     } catch (e) {
-      if (mounted) _showErrorSnackBar(e.toString());
-      return false;
+      return _userFriendlyInviteError(e);
     }
+  }
+
+  String _userFriendlyInviteError(dynamic e) {
+    if (e is FirebaseFunctionsException) {
+      final code = e.code.toString().toLowerCase();
+      final message = e.message?.trim();
+      if (message != null && message.isNotEmpty) return message;
+      if (code.contains('already') || code.contains('exists') || code == 'failed-precondition') {
+        return 'You\'re already a member of this workspace.';
+      }
+      if (code.contains('not-found') || code.contains('invalid') || code.contains('permission')) {
+        return 'Invalid or expired invite code.';
+      }
+      return e.code;
+    }
+    final s = e.toString();
+    if (s.startsWith('Exception: ')) return s.replaceFirst('Exception: ', '');
+    return s.isNotEmpty ? s : 'Failed to join workspace.';
   }
 
   Future<void> _showJoinWorkspaceModal() async {
@@ -137,6 +149,7 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
       builder: (context) => _JoinWorkspaceSheet(
         onAccept: _handleAcceptInvite,
         onSuccessClose: () => Navigator.of(context).pop(),
+        showErrorSnackBar: _showErrorSnackBar,
       ),
     );
   }
@@ -554,12 +567,14 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
 }
 
 class _JoinWorkspaceSheet extends StatefulWidget {
-  final Future<bool> Function(String code) onAccept;
+  final Future<String?> Function(String code) onAccept;
   final VoidCallback onSuccessClose;
+  final void Function(String message) showErrorSnackBar;
 
   const _JoinWorkspaceSheet({
     required this.onAccept,
     required this.onSuccessClose,
+    required this.showErrorSnackBar,
   });
 
   @override
@@ -569,6 +584,7 @@ class _JoinWorkspaceSheet extends StatefulWidget {
 class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
   final _inviteCodeController = TextEditingController();
   bool _accepting = false;
+  String? _bannerMessage;
 
   @override
   void dispose() {
@@ -576,13 +592,24 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
     super.dispose();
   }
 
+  void _showBanner(String message) {
+    if (mounted) setState(() => _bannerMessage = message);
+  }
+
   Future<void> _submit() async {
     final code = _inviteCodeController.text.trim();
-    if (code.isEmpty) return;
+    if (code.isEmpty) {
+      _showBanner('Enter an invite code');
+      return;
+    }
     setState(() => _accepting = true);
+    setState(() => _bannerMessage = null);
     try {
-      final success = await widget.onAccept(code);
-      if (success && mounted) {
+      final errorMessage = await widget.onAccept(code);
+      if (!mounted) return;
+      if (errorMessage != null) {
+        _showBanner(errorMessage);
+      } else {
         widget.onSuccessClose();
       }
     } finally {
@@ -662,6 +689,7 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.only(
         left: 24,
@@ -673,6 +701,38 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_bannerMessage != null) ...[
+            Material(
+              color: colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 20, color: colorScheme.onErrorContainer),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _bannerMessage!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                            ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, size: 20, color: colorScheme.onErrorContainer),
+                      onPressed: () => setState(() => _bannerMessage = null),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(32, 32),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(
             'Join a workspace',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -697,6 +757,9 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
             ),
             textCapitalization: TextCapitalization.none,
             autocorrect: false,
+            onChanged: (_) {
+              if (_bannerMessage != null) setState(() => _bannerMessage = null);
+            },
             onSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 12),
