@@ -95,17 +95,13 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
   }
 
   Future<void> _handleEditNote(Note note) async {
-    if (!_canEdit) {
-      _showErrorSnackBar('You do not have permission to edit notes');
-      return;
-    }
-
     final result = await Navigator.of(context).push<Note?>(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => NoteEditScreen(
           note: note,
           userId: _currentUser!.uid,
           workspaceId: _currentWorkspace!.id!,
+          canEdit: _canEdit,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);

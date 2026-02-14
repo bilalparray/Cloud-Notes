@@ -8,12 +8,15 @@ class NoteEditScreen extends StatefulWidget {
   final Note? note;
   final String userId;
   final String workspaceId;
+  /// If false, note is shown read-only (viewer); copy still works, editing and save are disabled.
+  final bool canEdit;
 
   const NoteEditScreen({
     super.key,
     this.note,
     required this.userId,
     required this.workspaceId,
+    this.canEdit = true,
   });
 
   @override
@@ -53,6 +56,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   }
 
   void _onTextChanged() {
+    if (!widget.canEdit) return;
     // Update UI immediately for word/char count
     setState(() {
       _hasChanges = true;
@@ -69,6 +73,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   }
 
   Future<void> _autoSave() async {
+    if (!widget.canEdit) return;
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
 
@@ -126,6 +131,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   }
 
   Future<void> _handleSave() async {
+    if (!widget.canEdit) return;
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
 
@@ -355,10 +361,20 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                widget.note == null ? 'New Note' : 'Edit Note',
+                widget.note == null
+                    ? 'New Note'
+                    : (widget.canEdit ? 'Edit Note' : 'View Note'),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              if (_isSaving || _isAutoSaving || _lastSaveTime != null)
+              if (!widget.canEdit)
+                Text(
+                  'View only',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                )
+              else if (_isSaving || _isAutoSaving || _lastSaveTime != null)
                 Row(
                   children: [
                     if (_isSaving || _isAutoSaving)
@@ -415,11 +431,12 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 onPressed: _copyContent,
                 tooltip: 'Copy content',
               ),
-              IconButton(
-                icon: const Icon(Icons.check_rounded),
-                onPressed: _handleSave,
-                tooltip: 'Save',
-              ),
+              if (widget.canEdit)
+                IconButton(
+                  icon: const Icon(Icons.check_rounded),
+                  onPressed: _handleSave,
+                  tooltip: 'Save',
+                ),
             ],
           ],
         ),
@@ -434,6 +451,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                     TextField(
                       controller: _titleController,
                       focusNode: _titleFocusNode,
+                      readOnly: !widget.canEdit,
                       decoration: InputDecoration(
                         hintText: 'Title',
                         hintStyle: TextStyle(
@@ -455,6 +473,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                     TextField(
                       controller: _contentController,
                       focusNode: _contentFocusNode,
+                      readOnly: !widget.canEdit,
                       decoration: InputDecoration(
                         hintText: 'Start writing...',
                         hintStyle: TextStyle(
@@ -520,7 +539,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       ),
                     ],
                   ),
-                  if (_hasChanges && !_isSaving && !_isAutoSaving)
+                  if (widget.canEdit && _hasChanges && !_isSaving && !_isAutoSaving)
                     Row(
                       children: [
                         Container(
