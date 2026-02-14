@@ -1,19 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../config/app_config.dart';
 import '../services/auth_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  static const String appVersion = '1.0.0';
-  static const String playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.qayham.cloudnotes';
-  static const String webUrl = 'https://qayham.com/cloudnotes';
-
-  static String get _shareText =>
-      'Check out Cloud Notes – sync your notes across devices.\n\n'
-      'Android: $playStoreUrl\n'
-      'Web: $webUrl';
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +66,23 @@ class SettingsScreen extends StatelessWidget {
           const _SettingsTile(
             icon: Icons.info_outline_rounded,
             title: 'Cloud Notes',
-            subtitle: 'Version $appVersion',
+            subtitle: 'Version ${AppConfig.appVersion}',
+          ),
+          ListTile(
+            leading: Icon(Icons.system_update_rounded,
+                size: 22, color: colorScheme.primary),
+            title: const Text(
+              'Check for updates',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              'Open Play Store',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            trailing: const Icon(Icons.open_in_new, size: 18),
+            onTap: () => _openPlayStore(context),
           ),
           const SizedBox(height: 32),
           Padding(
@@ -101,20 +109,39 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _openPlayStore(BuildContext context) async {
+    final uri = Uri.parse(AppConfig.playStoreUrl);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (context.mounted) {
+        _showSnackBar(context, 'Could not open Play Store');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showSnackBar(context, 'Could not open Play Store');
+      }
+    }
+  }
+
+  void _showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _shareApp(BuildContext context) async {
     try {
       await Share.share(
-        _shareText,
+        AppConfig.shareText,
         subject: 'Cloud Notes – App & Web',
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not share: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnackBar(context, 'Could not share: $e');
       }
     }
   }
