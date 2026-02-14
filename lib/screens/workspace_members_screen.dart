@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../models/workspace.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
@@ -165,6 +166,85 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
     } catch (e) {
       if (mounted) _showErrorSnackBar(e.toString());
     }
+  }
+
+  void _showQrCodeDialog(String inviteCode) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Invite code – QR'),
+        content: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320, maxHeight: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Scan to get the invite code',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: 232,
+                  height: 232,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: QrImageView(
+                      data: inviteCode,
+                      version: QrVersions.auto,
+                      size: 200,
+                      backgroundColor: Colors.white,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: Colors.black,
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SelectableText(
+                  inviteCode,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: inviteCode));
+              HapticFeedback.lightImpact();
+              _showSuccessSnackBar('Invite code copied');
+              Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copy code'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSuccessSnackBar(String message) {
@@ -517,18 +597,24 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
+                    onPressed: () => _showQrCodeDialog(workspace.id!),
+                    icon: const Icon(Icons.qr_code_rounded),
+                    tooltip: 'Show QR code',
+                  ),
+                  IconButton.filled(
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: workspace.id!));
                       HapticFeedback.lightImpact();
                       _showSuccessSnackBar('Invite code copied');
                     },
                     icon: const Icon(Icons.copy_rounded),
+                    tooltip: 'Copy code',
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                'Share this code. Others enter it in "Join a workspace" and tap Accept.',
+                'Share this code or QR code. Others enter it in "Join a workspace" and tap Accept.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),

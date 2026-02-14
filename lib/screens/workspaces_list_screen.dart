@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/workspace.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
+import 'qr_scan_screen.dart';
 import 'workspace_notes_screen.dart';
 
 class WorkspacesListScreen extends StatefulWidget {
@@ -588,6 +590,76 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
     }
   }
 
+  Future<void> _scanQrCode() async {
+    try {
+      final status = await Permission.camera.status;
+      if (!status.isGranted) {
+        final result = await Permission.camera.request();
+        if (!result.isGranted && mounted) {
+          _showCameraPermissionDenied(context, permanentlyDenied: result.isPermanentlyDenied);
+          return;
+        }
+      }
+    } on Exception {
+      // permission_handler can throw (e.g. MissingPluginException) if native plugin
+      // isn't registered (hot reload, or platform not fully set up). Proceed to scanner;
+      // opening the camera will trigger the system permission prompt if needed.
+    }
+    if (!mounted) return;
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => const QrScanScreen(),
+      ),
+    );
+    if (code != null && code.isNotEmpty && mounted) {
+      _inviteCodeController.text = code;
+      _inviteCodeController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: code.length,
+      );
+    }
+  }
+
+  void _showCameraPermissionDenied(BuildContext context, {bool permanentlyDenied = false}) {
+    final messenger = ScaffoldMessenger.of(context);
+    if (permanentlyDenied) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Camera access needed'),
+          content: const Text(
+            'Camera permission was denied. To scan QR codes, please allow camera access in your device settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                openAppSettings();
+              },
+              child: const Text('Open settings'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Camera permission is needed to scan QR codes.'),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'OK',
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -619,13 +691,22 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
             controller: _inviteCodeController,
             decoration: const InputDecoration(
               labelText: 'Invite code',
-              hintText: 'Paste the code here',
+              hintText: 'Paste the code here or scan QR',
               border: OutlineInputBorder(),
               isDense: true,
             ),
             textCapitalization: TextCapitalization.none,
             autocorrect: false,
             onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _scanQrCode,
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+              label: const Text('Scan QR code'),
+            ),
           ),
           const SizedBox(height: 20),
           SizedBox(

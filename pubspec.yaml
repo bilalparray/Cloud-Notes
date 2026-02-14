@@ -19,6 +19,9 @@ dependencies:
   
   # UI
   cupertino_icons: ^1.0.6
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.2
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
