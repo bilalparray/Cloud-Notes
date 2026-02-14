@@ -219,20 +219,26 @@ class _InvitationAcceptanceScreenState
   }
 
   void _showSuccessSnackBar(String message) {
+    final colorScheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(
               Icons.check_circle,
-              color: Colors.green.shade300,
+              color: colorScheme.primary,
               size: 20,
             ),
             const SizedBox(width: 12),
-            Text(message),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: colorScheme.onSurface),
+              ),
+            ),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        backgroundColor: colorScheme.surfaceContainerHighest,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),

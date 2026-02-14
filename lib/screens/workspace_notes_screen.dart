@@ -122,7 +122,12 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
       if (mounted && showUndo) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Note "$noteTitle" deleted'),
+            content: Text(
+              'Note "$noteTitle" deleted',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
             backgroundColor:
                 Theme.of(context).colorScheme.surfaceContainerHighest,
             behavior: SnackBarBehavior.floating,
@@ -154,20 +159,26 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
   }
 
   void _showSuccessSnackBar(String message) {
+    final colorScheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             Icon(
               Icons.check_circle,
-              color: Colors.green.shade300,
+              color: colorScheme.primary,
               size: 20,
             ),
             const SizedBox(width: 12),
-            Text(message),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: colorScheme.onSurface),
+              ),
+            ),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        backgroundColor: colorScheme.surfaceContainerHighest,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),

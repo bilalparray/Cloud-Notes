@@ -39,18 +39,18 @@ class CloudNotesApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
+          seedColor: const Color(0xFF2563EB),
           brightness: Brightness.light,
         ).copyWith(
-          primary: const Color(0xFF6366F1),
-          secondary: const Color(0xFF8B5CF6),
-          tertiary: const Color(0xFFEC4899),
-          surface: const Color(0xFFFFFBFE),
-          surfaceContainerHighest: const Color(0xFFF5F3FF),
-          primaryContainer: const Color(0xFFE0E7FF),
-          secondaryContainer: const Color(0xFFF3E8FF),
-          errorContainer: const Color(0xFFFFDAD6),
-          onErrorContainer: const Color(0xFF410002),
+          primary: const Color(0xFF2563EB),
+          secondary: const Color(0xFF3B82F6),
+          tertiary: const Color(0xFF0EA5E9),
+          surface: const Color(0xFFF8FAFC),
+          surfaceContainerHighest: const Color(0xFFF1F5F9),
+          primaryContainer: const Color(0xFFDBEAFE),
+          secondaryContainer: const Color(0xFFBFDBFE),
+          errorContainer: const Color(0xFFFEE2E2),
+          onErrorContainer: const Color(0xFF7F1D1D),
         ),
         useMaterial3: true,
         cardTheme: CardThemeData(
@@ -69,12 +69,12 @@ class CloudNotesApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
-          backgroundColor: Color(0xFFFFFBFE),
-          foregroundColor: Color(0xFF1E1B4B),
+          backgroundColor: Color(0xFFF8FAFC),
+          foregroundColor: Color(0xFF0F172A),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 4,
-          backgroundColor: const Color(0xFF6366F1),
+          backgroundColor: const Color(0xFF2563EB),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -83,18 +83,18 @@ class CloudNotesApp extends StatelessWidget {
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF818CF8),
+          seedColor: const Color(0xFF3B82F6),
           brightness: Brightness.dark,
         ).copyWith(
-          primary: const Color(0xFF818CF8),
-          secondary: const Color(0xFFA78BFA),
-          tertiary: const Color(0xFFF472B6),
-          surface: const Color(0xFF1E1B4B),
-          surfaceContainerHighest: const Color(0xFF312E81),
-          primaryContainer: const Color(0xFF4338CA),
-          secondaryContainer: const Color(0xFF6D28D9),
-          errorContainer: const Color(0xFF93000A),
-          onErrorContainer: const Color(0xFFFFDAD6),
+          primary: const Color(0xFF3B82F6),
+          secondary: const Color(0xFF60A5FA),
+          tertiary: const Color(0xFF38BDF8),
+          surface: const Color(0xFF0F172A),
+          surfaceContainerHighest: const Color(0xFF1E293B),
+          primaryContainer: const Color(0xFF1E3A8A),
+          secondaryContainer: const Color(0xFF1E40AF),
+          errorContainer: const Color(0xFF7F1D1D),
+          onErrorContainer: const Color(0xFFFECACA),
         ),
         useMaterial3: true,
         cardTheme: CardThemeData(
@@ -102,7 +102,7 @@ class CloudNotesApp extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          color: const Color(0xFF312E81),
+          color: const Color(0xFF1E293B),
         ),
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(
@@ -113,19 +113,19 @@ class CloudNotesApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
-          backgroundColor: Color(0xFF1E1B4B),
+          backgroundColor: Color(0xFF0F172A),
           foregroundColor: Colors.white,
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
           elevation: 4,
-          backgroundColor: const Color(0xFF818CF8),
+          backgroundColor: const Color(0xFF3B82F6),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       home: const AuthWrapper(),
     );
   }

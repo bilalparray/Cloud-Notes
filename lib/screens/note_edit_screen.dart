@@ -131,24 +131,29 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 
     if (title.isEmpty && content.isEmpty) {
       HapticFeedback.lightImpact();
+      final colorScheme = Theme.of(context).colorScheme;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               Icon(
                 Icons.info_outline_rounded,
-                color: Colors.orange.shade300,
+                color: colorScheme.primary,
                 size: 20,
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Note cannot be empty',
-                style: TextStyle(color: Colors.black, fontSize: 16),
+              Expanded(
+                child: Text(
+                  'Note cannot be empty',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ],
           ),
-          backgroundColor:
-              Theme.of(context).colorScheme.surfaceContainerHighest,
+          backgroundColor: colorScheme.surfaceContainerHighest,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
