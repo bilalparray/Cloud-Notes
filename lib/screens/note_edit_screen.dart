@@ -97,8 +97,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         title: title,
         content: content,
         createdAt: widget.note!.createdAt,
+        updatedAt: DateTime.now(),
         userId: widget.userId,
         workspaceId: widget.workspaceId,
+        isPinned: widget.note!.isPinned,
       );
 
       await _notesService.updateNote(note);
@@ -178,13 +180,16 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     HapticFeedback.mediumImpact();
 
     try {
+      final now = DateTime.now();
       final note = Note(
         id: widget.note?.id,
         title: title,
         content: content,
-        createdAt: widget.note?.createdAt ?? DateTime.now(),
+        createdAt: widget.note?.createdAt ?? now,
+        updatedAt: now,
         userId: widget.userId,
         workspaceId: widget.workspaceId,
+        isPinned: widget.note?.isPinned ?? false,
       );
 
       if (widget.note == null) {

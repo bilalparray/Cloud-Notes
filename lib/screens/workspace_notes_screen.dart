@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/note.dart';
 import '../models/workspace.dart';
 import '../services/auth_service.dart';
@@ -31,12 +32,17 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
   Workspace? _currentWorkspace;
   String? _cachedNotesWorkspaceId;
   Stream<List<Note>>? _cachedNotesStream;
+  String _sortOption = 'updatedAt'; // 'updatedAt' | 'createdAt' | 'title'
+  bool _showFavoritesOnly = false;
+
+  static const String _sortKeyPrefix = 'notes_sort_';
 
   @override
   void initState() {
     super.initState();
     _currentUser = _authService.currentUser;
     _currentWorkspace = widget.workspace;
+    _loadSortPreference();
     // Load workspace once to ensure we have the latest data
     _workspaceService.getWorkspaceById(widget.workspace.id!).then((workspace) {
       if (workspace != null && mounted) {
@@ -45,6 +51,22 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
         });
       }
     });
+  }
+
+  Future<void> _loadSortPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _sortKeyPrefix + (widget.workspace.id ?? '');
+    final value = prefs.getString(key);
+    if (value != null && ['updatedAt', 'createdAt', 'title'].contains(value) && mounted) {
+      setState(() => _sortOption = value);
+    }
+  }
+
+  Future<void> _saveSortPreference(String value) async {
+    final workspaceId = _currentWorkspace?.id ?? widget.workspace.id;
+    if (workspaceId == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sortKeyPrefix + workspaceId, value);
   }
 
   @override
@@ -235,6 +257,99 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
       return note.title.toLowerCase().contains(query) ||
           note.content.toLowerCase().contains(query);
     }).toList();
+  }
+
+  List<Note> _sortNotes(List<Note> notes) {
+    final list = List<Note>.from(notes);
+    list.sort((a, b) {
+      // Pinned first
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      switch (_sortOption) {
+        case 'createdAt':
+          return b.createdAt.compareTo(a.createdAt);
+        case 'title':
+          return (a.title.isEmpty ? 'Untitled' : a.title)
+              .toLowerCase()
+              .compareTo((b.title.isEmpty ? 'Untitled' : b.title).toLowerCase());
+        case 'updatedAt':
+        default:
+          return b.updatedAt.compareTo(a.updatedAt);
+      }
+    });
+    return list;
+  }
+
+  List<Note> _getSortedAndFilteredNotes(List<Note> notes) {
+    var list = _filterNotes(notes);
+    if (_showFavoritesOnly) list = list.where((n) => n.isPinned).toList();
+    return _sortNotes(list);
+  }
+
+  Future<void> _togglePin(Note note) async {
+    if (!_canEdit || note.id == null) return;
+    try {
+      await _notesService.updateNote(note.copyWith(
+        isPinned: !note.isPinned,
+        updatedAt: DateTime.now(),
+      ));
+      if (mounted) {
+        _showSuccessSnackBar(
+            note.isPinned ? 'Note unpinned' : 'Note pinned');
+      }
+    } catch (e) {
+      if (mounted) _showErrorSnackBar('Failed to update pin');
+    }
+  }
+
+  Widget _buildFilterSortBar(BuildContext context, bool canEdit) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final sortLabels = {
+      'updatedAt': 'Last modified',
+      'createdAt': 'Created',
+      'title': 'Title',
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('All'),
+            selected: !_showFavoritesOnly,
+            onSelected: (v) => setState(() => _showFavoritesOnly = false),
+            selectedColor: colorScheme.primaryContainer,
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            avatar: Icon(
+              _showFavoritesOnly ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: 18,
+              color: _showFavoritesOnly ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            ),
+            label: const Text('Favorites'),
+            selected: _showFavoritesOnly,
+            onSelected: (v) => setState(() => _showFavoritesOnly = true),
+            selectedColor: colorScheme.primaryContainer,
+          ),
+          const Spacer(),
+          DropdownButton<String>(
+            value: _sortOption,
+            underline: const SizedBox(),
+            icon: Icon(Icons.sort_rounded, size: 20, color: colorScheme.primary),
+            items: sortLabels.entries
+                .map((e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text(e.value, style: const TextStyle(fontSize: 14)),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _sortOption = value);
+              _saveSortPreference(value);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -503,7 +618,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                     }
 
                     final allNotes = snapshot.data ?? [];
-                    final filteredNotes = _filterNotes(allNotes);
+                    final filteredNotes = _getSortedAndFilteredNotes(allNotes);
 
                     if (allNotes.isEmpty) {
                       return Center(
@@ -572,17 +687,65 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                       );
                     }
 
+                    if (filteredNotes.isEmpty && _showFavoritesOnly) {
+                      return Column(
+                        children: [
+                          _buildFilterSortBar(context, canEdit),
+                          Expanded(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.star_outline_rounded,
+                                    size: 64,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No pinned notes',
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Pin notes to see them here',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
                     return RefreshIndicator(
                       onRefresh: () async {
                         await Future.delayed(const Duration(milliseconds: 500));
                       },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        itemCount: filteredNotes.length,
-                        itemBuilder: (context, index) {
-                          final note = filteredNotes[index];
-                          return _buildNoteCard(note, index, canEdit);
-                        },
+                      child: Column(
+                        children: [
+                          _buildFilterSortBar(context, canEdit),
+                          Expanded(
+                            child: ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                              itemCount: filteredNotes.length,
+                              itemBuilder: (context, index) {
+                                final note = filteredNotes[index];
+                                return _buildNoteCard(note, index, canEdit);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -668,6 +831,21 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                                   ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          note.isPinned ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 22,
+                          color: note.isPinned
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        onPressed: canEdit ? () => _togglePin(note) : null,
+                        tooltip: note.isPinned ? 'Unpin' : 'Pin to favorites',
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(40, 40),
+                          padding: EdgeInsets.zero,
                         ),
                       ),
                       if (canEdit)
