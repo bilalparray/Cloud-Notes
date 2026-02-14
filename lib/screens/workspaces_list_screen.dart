@@ -102,35 +102,41 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
   }
 
 
-  final _inviteCodeController = TextEditingController();
-  bool _acceptingInvite = false;
-
-  @override
-  void dispose() {
-    _inviteCodeController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _handleAcceptInvite() async {
-    final code = _inviteCodeController.text.trim();
+  /// Returns true if join succeeded, false otherwise.
+  Future<bool> _handleAcceptInvite(String code) async {
     if (code.isEmpty) {
       _showErrorSnackBar('Enter an invite code');
-      return;
+      return false;
     }
-    setState(() => _acceptingInvite = true);
     try {
       await _workspaceService.acceptInviteByCode(code);
       if (mounted) {
-        _inviteCodeController.clear();
         _showSuccessSnackBar('Joined workspace');
+        return true;
       }
+      return false;
     } on FirebaseFunctionsException catch (e) {
       if (mounted) _showErrorSnackBar(e.message ?? e.code);
+      return false;
     } catch (e) {
       if (mounted) _showErrorSnackBar(e.toString());
-    } finally {
-      if (mounted) setState(() => _acceptingInvite = false);
+      return false;
     }
+  }
+
+  Future<void> _showJoinWorkspaceModal() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _JoinWorkspaceSheet(
+        onAccept: _handleAcceptInvite,
+        onSuccessClose: () => Navigator.of(context).pop(),
+      ),
+    );
   }
 
   Future<void> _handleLogout() async {
@@ -281,6 +287,20 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
             ),
             itemBuilder: (context) => [
               PopupMenuItem(
+                value: 'join_workspace',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.login_rounded,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Join workspace'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
                 value: 'logout',
                 child: Row(
                   children: [
@@ -301,7 +321,9 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
               ),
             ],
             onSelected: (value) {
-              if (value == 'logout') {
+              if (value == 'join_workspace') {
+                _showJoinWorkspaceModal();
+              } else if (value == 'logout') {
                 _handleLogout();
               }
             },
@@ -347,61 +369,6 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
 
           return CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Join a workspace',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _inviteCodeController,
-                            decoration: const InputDecoration(
-                              labelText: 'Invite code',
-                              hintText: 'Paste the code shared by the owner',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            textCapitalization: TextCapitalization.none,
-                            autocorrect: false,
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: _acceptingInvite ? null : _handleAcceptInvite,
-                              icon: _acceptingInvite
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.login_rounded, size: 20),
-                              label: Text(_acceptingInvite ? 'Accepting...' : 'Accept'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
               if (workspaces.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
@@ -423,7 +390,7 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Create one or use an invite code above to join.',
+                            'Create one or join a workspace from the menu.',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
@@ -579,6 +546,103 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
               color: textColor,
               fontWeight: FontWeight.bold,
             ),
+      ),
+    );
+  }
+}
+
+class _JoinWorkspaceSheet extends StatefulWidget {
+  final Future<bool> Function(String code) onAccept;
+  final VoidCallback onSuccessClose;
+
+  const _JoinWorkspaceSheet({
+    required this.onAccept,
+    required this.onSuccessClose,
+  });
+
+  @override
+  State<_JoinWorkspaceSheet> createState() => _JoinWorkspaceSheetState();
+}
+
+class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
+  final _inviteCodeController = TextEditingController();
+  bool _accepting = false;
+
+  @override
+  void dispose() {
+    _inviteCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final code = _inviteCodeController.text.trim();
+    if (code.isEmpty) return;
+    setState(() => _accepting = true);
+    try {
+      final success = await widget.onAccept(code);
+      if (success && mounted) {
+        widget.onSuccessClose();
+      }
+    } finally {
+      if (mounted) setState(() => _accepting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Join a workspace',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Enter the invite code shared by the workspace owner.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _inviteCodeController,
+            decoration: const InputDecoration(
+              labelText: 'Invite code',
+              hintText: 'Paste the code here',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            textCapitalization: TextCapitalization.none,
+            autocorrect: false,
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _accepting ? null : _submit,
+              icon: _accepting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.login_rounded, size: 20),
+              label: Text(_accepting ? 'Accepting...' : 'Accept'),
+            ),
+          ),
+        ],
       ),
     );
   }
