@@ -263,8 +263,10 @@ class WorkspaceService {
   }
 
   /// Accept workspace invite by code (workspace ID). Calls Cloud Function.
+  /// Uses us-central1 region explicitly to avoid CORS/URL mismatch on web.
   Future<void> acceptInviteByCode(String workspaceId) async {
-    final result = await FirebaseFunctions.instance
+    final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+    final result = await functions
         .httpsCallable('acceptInvite')
         .call(<String, dynamic>{'workspaceId': workspaceId.trim()});
     if (result.data is Map && (result.data as Map)['success'] != true) {
