@@ -303,55 +303,61 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.settings_rounded,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Settings'),
-                  ],
+            itemBuilder: (context) {
+              final textStyle = Theme.of(context).textTheme.bodyLarge;
+              return [
+                PopupMenuItem(
+                  value: 'settings',
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.settings_rounded,
+                        size: 24,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 16),
+                      Text('Settings', style: textStyle),
+                    ],
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'join_workspace',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.login_rounded,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Join workspace'),
-                  ],
+                PopupMenuItem(
+                  value: 'join_workspace',
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.login_rounded,
+                        size: 24,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 16),
+                      Text('Join workspace', style: textStyle),
+                    ],
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.logout_rounded,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Logout',
-                      style: TextStyle(
+                PopupMenuItem(
+                  value: 'logout',
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.logout_rounded,
+                        size: 24,
                         color: Theme.of(context).colorScheme.error,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 16),
+                      Text(
+                        'Logout',
+                        style: textStyle?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ];
+            },
             onSelected: (value) {
               if (value == 'settings') {
                 Navigator.of(context).push(
