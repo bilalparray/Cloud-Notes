@@ -244,6 +244,38 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     }
   }
 
+  void _copyTitle() {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      _showSnackBar('Nothing to copy');
+      return;
+    }
+    Clipboard.setData(ClipboardData(text: title));
+    HapticFeedback.lightImpact();
+    _showSnackBar('Title copied');
+  }
+
+  void _copyContent() {
+    final content = _contentController.text;
+    if (content.isEmpty) {
+      _showSnackBar('Nothing to copy');
+      return;
+    }
+    Clipboard.setData(ClipboardData(text: content));
+    HapticFeedback.lightImpact();
+    _showSnackBar('Content copied');
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<bool> _handleBack() async {
     // Cancel any pending auto-save
     _autoSaveTimer?.cancel();
@@ -372,12 +404,23 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            else
+            else ...[
+              IconButton(
+                icon: const Icon(Icons.title_rounded),
+                onPressed: _copyTitle,
+                tooltip: 'Copy title',
+              ),
+              IconButton(
+                icon: const Icon(Icons.content_copy_rounded),
+                onPressed: _copyContent,
+                tooltip: 'Copy content',
+              ),
               IconButton(
                 icon: const Icon(Icons.check_rounded),
                 onPressed: _handleSave,
                 tooltip: 'Save',
               ),
+            ],
           ],
         ),
         body: Column(
