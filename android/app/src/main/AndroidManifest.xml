@@ -36,16 +36,7 @@
                 <data
                     android:scheme="https"
                     android:host="qayham.com"
-                    android:pathPrefix="/join" />
-                     <data
-                    android:scheme="https"
-                    android:host="qayham.com"
                     android:pathPrefix="/cloudnotes" />
-                <data
-                    android:scheme="https"
-                    android:host="qayham.com"
-                    android:pathPrefix="/cloudnotes/join" />
-             
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
