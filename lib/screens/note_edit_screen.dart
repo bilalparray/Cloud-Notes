@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../services/note_image_service.dart';
 import '../services/notes_service.dart';
+import '../widgets/note_image_preview_stub.dart' if (dart.library.html) '../widgets/note_image_preview_web.dart' as image_preview;
 
 class NoteEditScreen extends StatefulWidget {
   final Note? note;
@@ -378,11 +379,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
             ],
           ),
           clipBehavior: Clip.antiAlias,
-          child: Image.network(
-            url,
+          child: image_preview.buildNoteImagePreview(
+            url: url,
+            width: 120,
+            height: 120,
             fit: BoxFit.cover,
             loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
+              if (loadingProgress == null) return child ?? const SizedBox.shrink();
               return Center(
                 child: CircularProgressIndicator(
                   value: loadingProgress.expectedTotalBytes != null
