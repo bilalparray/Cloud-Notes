@@ -243,6 +243,7 @@ class _InvitationAcceptanceScreenState
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -273,6 +274,7 @@ class _InvitationAcceptanceScreenState
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

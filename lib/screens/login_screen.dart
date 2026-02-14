@@ -83,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen>
               borderRadius: BorderRadius.circular(10),
             ),
             margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -130,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen>
               borderRadius: BorderRadius.circular(10),
             ),
             margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -163,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen>
               borderRadius: BorderRadius.circular(10),
             ),
             margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
           ),
         );
       }

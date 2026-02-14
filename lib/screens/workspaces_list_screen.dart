@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -253,7 +255,7 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -585,15 +587,21 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
   final _inviteCodeController = TextEditingController();
   bool _accepting = false;
   String? _bannerMessage;
+  Timer? _bannerDismissTimer;
 
   @override
   void dispose() {
+    _bannerDismissTimer?.cancel();
     _inviteCodeController.dispose();
     super.dispose();
   }
 
   void _showBanner(String message) {
+    _bannerDismissTimer?.cancel();
     if (mounted) setState(() => _bannerMessage = message);
+    _bannerDismissTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _bannerMessage = null);
+    });
   }
 
   Future<void> _submit() async {
@@ -602,6 +610,7 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
       _showBanner('Enter an invite code');
       return;
     }
+    _bannerDismissTimer?.cancel();
     setState(() => _accepting = true);
     setState(() => _bannerMessage = null);
     try {
@@ -678,6 +687,7 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
         SnackBar(
           content: const Text('Camera permission is needed to scan QR codes.'),
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
           action: SnackBarAction(
             label: 'OK',
             onPressed: () {},
@@ -721,7 +731,10 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
                     ),
                     IconButton(
                       icon: Icon(Icons.close, size: 20, color: colorScheme.onErrorContainer),
-                      onPressed: () => setState(() => _bannerMessage = null),
+                      onPressed: () {
+                        _bannerDismissTimer?.cancel();
+                        setState(() => _bannerMessage = null);
+                      },
                       style: IconButton.styleFrom(
                         minimumSize: const Size(32, 32),
                         padding: EdgeInsets.zero,
@@ -758,7 +771,10 @@ class _JoinWorkspaceSheetState extends State<_JoinWorkspaceSheet> {
             textCapitalization: TextCapitalization.none,
             autocorrect: false,
             onChanged: (_) {
-              if (_bannerMessage != null) setState(() => _bannerMessage = null);
+              if (_bannerMessage != null) {
+                _bannerDismissTimer?.cancel();
+                setState(() => _bannerMessage = null);
+              }
             },
             onSubmitted: (_) => _submit(),
           ),

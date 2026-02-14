@@ -272,7 +272,7 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -304,7 +304,7 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

@@ -160,7 +160,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                 }
               },
             ),
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -227,7 +227,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

@@ -158,6 +158,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
@@ -229,6 +230,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               textColor: Theme.of(context).colorScheme.onErrorContainer,
               onPressed: _handleSave,
             ),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
