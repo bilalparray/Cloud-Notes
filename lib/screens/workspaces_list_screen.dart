@@ -8,6 +8,7 @@ import '../models/workspace.dart';
 import '../services/auth_service.dart';
 import '../services/workspace_service.dart';
 import 'qr_scan_screen.dart';
+import 'settings_screen.dart';
 import 'workspace_notes_screen.dart';
 
 class WorkspacesListScreen extends StatefulWidget {
@@ -304,6 +305,20 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
             ),
             itemBuilder: (context) => [
               PopupMenuItem(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.settings_rounded,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Settings'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
                 value: 'join_workspace',
                 child: Row(
                   children: [
@@ -338,7 +353,13 @@ class _WorkspacesListScreenState extends State<WorkspacesListScreen> {
               ),
             ],
             onSelected: (value) {
-              if (value == 'join_workspace') {
+              if (value == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
+                );
+              } else if (value == 'join_workspace') {
                 _showJoinWorkspaceModal();
               } else if (value == 'logout') {
                 _handleLogout();
