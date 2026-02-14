@@ -29,6 +29,8 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
   String _searchQuery = '';
   bool _isSearching = false;
   Workspace? _currentWorkspace;
+  String? _cachedNotesWorkspaceId;
+  Stream<List<Note>>? _cachedNotesStream;
 
   @override
   void initState() {
@@ -54,6 +56,17 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
   bool get _canEdit {
     if (_currentUser == null || _currentWorkspace == null) return false;
     return _currentWorkspace!.canEdit(_currentUser!.uid);
+  }
+
+  /// Cached notes stream so we don't recreate it on every build (which would
+  /// reset the StreamBuilder and keep it in waiting state for new workspaces).
+  Stream<List<Note>> _getNotesStreamFor(String workspaceId) {
+    if (_cachedNotesWorkspaceId == workspaceId && _cachedNotesStream != null) {
+      return _cachedNotesStream!;
+    }
+    _cachedNotesWorkspaceId = workspaceId;
+    _cachedNotesStream = _notesService.getNotesStream(workspaceId);
+    return _cachedNotesStream!;
   }
 
   Future<void> _handleCreateNote() async {
@@ -419,7 +432,7 @@ class _WorkspaceNotesScreenState extends State<WorkspaceNotesScreen> {
                   ),
                 )
               : StreamBuilder<List<Note>>(
-                  stream: _notesService.getNotesStream(workspace.id!),
+                  stream: _getNotesStreamFor(workspace.id!),
                   builder: (context, snapshot) {
                     // Show loading only when truly waiting for initial data
                     // Once stream is active or done, proceed (even if empty list)
