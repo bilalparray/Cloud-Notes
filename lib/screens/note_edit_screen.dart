@@ -1,7 +1,13 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gal/gal.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
+import '../services/note_image_service.dart';
 import '../services/notes_service.dart';
 
 class NoteEditScreen extends StatefulWidget {
@@ -25,6 +31,7 @@ class NoteEditScreen extends StatefulWidget {
 
 class _NoteEditScreenState extends State<NoteEditScreen> {
   final NotesService _notesService = NotesService();
+  final NoteImageService _imageService = NoteImageService();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
   final FocusNode _titleFocusNode = FocusNode();
@@ -34,8 +41,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   bool _hasChanges = false;
   bool _isSaving = false;
   bool _isAutoSaving = false;
+  bool _isUploadingImage = false;
   DateTime? _lastSaveTime;
   Timer? _autoSaveTimer;
+  List<String> _imageUrls = [];
 
   @override
   void initState() {
@@ -43,6 +52,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     if (widget.note != null) {
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content;
+      _imageUrls = List.from(widget.note!.imageUrls);
     }
     _titleController.addListener(_onTextChanged);
     _contentController.addListener(_onTextChanged);
@@ -101,6 +111,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         userId: widget.userId,
         workspaceId: widget.workspaceId,
         isPinned: widget.note!.isPinned,
+        imageUrls: _imageUrls,
       );
 
       await _notesService.updateNote(note);
@@ -190,6 +201,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         userId: widget.userId,
         workspaceId: widget.workspaceId,
         isPinned: widget.note?.isPinned ?? false,
+        imageUrls: _imageUrls,
       );
 
       if (widget.note == null) {
@@ -284,6 +296,139 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
+    );
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    if (widget.note?.id == null || !widget.canEdit) return;
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() => _isUploadingImage = true);
+    try {
+      final url = await _imageService.uploadImageBytes(
+        workspaceId: widget.workspaceId,
+        noteId: widget.note!.id!,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      setState(() {
+        _imageUrls = [..._imageUrls, url];
+        _isUploadingImage = false;
+      });
+      await _notesService.updateNote(widget.note!.copyWith(
+        imageUrls: _imageUrls,
+        updatedAt: DateTime.now(),
+      ));
+      if (mounted) _showSnackBar('Image added');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+        _showSnackBar('Failed to add image: $e');
+      }
+    }
+  }
+
+  Future<void> _removeImage(String url) async {
+    if (!widget.canEdit || widget.note?.id == null) return;
+    setState(() => _imageUrls = _imageUrls.where((u) => u != url).toList());
+    try {
+      await _notesService.updateNote(widget.note!.copyWith(
+        imageUrls: _imageUrls,
+        updatedAt: DateTime.now(),
+      ));
+      if (mounted) _showSnackBar('Image removed');
+    } catch (e) {
+      if (mounted) _showSnackBar('Failed to remove image');
+    }
+  }
+
+  Future<void> _downloadImage(String imageUrl) async {
+    try {
+      if (kIsWeb) {
+        await launchUrl(Uri.parse(imageUrl), mode: LaunchMode.platformDefault);
+        return;
+      }
+      final bytes = await _imageService.getImageBytes(imageUrl);
+      await Gal.putImageBytes(Uint8List.fromList(bytes));
+      if (mounted) _showSnackBar('Image saved to gallery');
+    } catch (e) {
+      if (mounted) _showSnackBar('Failed to save image: $e');
+    }
+  }
+
+  Widget _buildImageTile(String url, ColorScheme colorScheme) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            url,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                          (loadingProgress.expectedTotalBytes ?? 1)
+                      : null,
+                  strokeWidth: 2,
+                ),
+              );
+            },
+            errorBuilder: (_, __, ___) => Icon(Icons.broken_image_rounded, color: colorScheme.error),
+          ),
+        ),
+        Positioned(
+          right: -4,
+          top: -4,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton.filled(
+                icon: const Icon(Icons.download_rounded, size: 18),
+                onPressed: () => _downloadImage(url),
+                tooltip: 'Save image',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  foregroundColor: colorScheme.onSurface,
+                ),
+              ),
+              if (widget.canEdit)
+                IconButton.filled(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: () => _removeImage(url),
+                  tooltip: 'Remove image',
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(32, 32),
+                    padding: EdgeInsets.zero,
+                    backgroundColor: colorScheme.errorContainer,
+                    foregroundColor: colorScheme.onErrorContainer,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -495,6 +640,44 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.newline,
                     ),
+                    if (_imageUrls.isNotEmpty || (widget.canEdit && widget.note != null)) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Text(
+                            'Images',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          if (widget.canEdit && widget.note != null) ...[
+                            const SizedBox(width: 12),
+                            if (_isUploadingImage)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.add_photo_alternate_rounded),
+                                onPressed: _pickAndUploadImage,
+                                tooltip: 'Add image',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: colorScheme.primaryContainer,
+                                ),
+                              ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: _imageUrls.map((url) => _buildImageTile(url, colorScheme)).toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),

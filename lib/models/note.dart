@@ -9,6 +9,7 @@ class Note {
   final String userId;
   final String workspaceId;
   final bool isPinned;
+  final List<String> imageUrls;
 
   Note({
     this.id,
@@ -19,12 +20,18 @@ class Note {
     required this.userId,
     required this.workspaceId,
     this.isPinned = false,
-  }) : updatedAt = updatedAt ?? createdAt;
+    List<String>? imageUrls,
+  })  : updatedAt = updatedAt ?? createdAt,
+        imageUrls = imageUrls ?? const [];
 
   factory Note.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     final updatedAt = (data['updatedAt'] as Timestamp?)?.toDate() ?? createdAt;
+    final imageUrlsRaw = data['imageUrls'];
+    final imageUrls = imageUrlsRaw is List
+        ? imageUrlsRaw.map((e) => e.toString()).toList()
+        : <String>[];
     return Note(
       id: doc.id,
       title: data['title'] ?? '',
@@ -34,6 +41,7 @@ class Note {
       userId: data['userId'] ?? '',
       workspaceId: data['workspaceId'] ?? '',
       isPinned: data['isPinned'] == true,
+      imageUrls: imageUrls,
     );
   }
 
@@ -46,6 +54,7 @@ class Note {
       'userId': userId,
       'workspaceId': workspaceId,
       'isPinned': isPinned,
+      'imageUrls': imageUrls,
     };
   }
 
@@ -58,6 +67,7 @@ class Note {
     String? userId,
     String? workspaceId,
     bool? isPinned,
+    List<String>? imageUrls,
   }) {
     return Note(
       id: id ?? this.id,
@@ -68,6 +78,7 @@ class Note {
       userId: userId ?? this.userId,
       workspaceId: workspaceId ?? this.workspaceId,
       isPinned: isPinned ?? this.isPinned,
+      imageUrls: imageUrls ?? this.imageUrls,
     );
   }
 }
