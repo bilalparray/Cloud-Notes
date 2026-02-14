@@ -46,6 +46,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   DateTime? _lastSaveTime;
   Timer? _autoSaveTimer;
   List<String> _imageUrls = [];
+  List<String> _imageThumbUrls = [];
 
   @override
   void initState() {
@@ -54,6 +55,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content;
       _imageUrls = List.from(widget.note!.imageUrls);
+      _imageThumbUrls = List.from(widget.note!.imageThumbUrls);
     }
     _titleController.addListener(_onTextChanged);
     _contentController.addListener(_onTextChanged);
@@ -113,6 +115,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         workspaceId: widget.workspaceId,
         isPinned: widget.note!.isPinned,
         imageUrls: _imageUrls,
+        imageThumbUrls: _imageThumbUrls,
       );
 
       await _notesService.updateNote(note);
@@ -203,6 +206,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         workspaceId: widget.workspaceId,
         isPinned: widget.note?.isPinned ?? false,
         imageUrls: _imageUrls,
+        imageThumbUrls: _imageThumbUrls,
       );
 
       if (widget.note == null) {
@@ -309,18 +313,20 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     if (!mounted) return;
     setState(() => _isUploadingImage = true);
     try {
-      final url = await _imageService.uploadImageBytes(
+      final result = await _imageService.uploadImageBytesWithThumb(
         workspaceId: widget.workspaceId,
         noteId: widget.note!.id!,
         bytes: bytes,
       );
       if (!mounted) return;
       setState(() {
-        _imageUrls = [..._imageUrls, url];
+        _imageUrls = [..._imageUrls, result.fullUrl];
+        _imageThumbUrls = [..._imageThumbUrls, result.thumbUrl];
         _isUploadingImage = false;
       });
       await _notesService.updateNote(widget.note!.copyWith(
         imageUrls: _imageUrls,
+        imageThumbUrls: _imageThumbUrls,
         updatedAt: DateTime.now(),
       ));
       if (mounted) _showSnackBar('Image added');
@@ -332,12 +338,21 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     }
   }
 
-  Future<void> _removeImage(String url) async {
+  Future<void> _removeImage(String fullUrl) async {
     if (!widget.canEdit || widget.note?.id == null) return;
-    setState(() => _imageUrls = _imageUrls.where((u) => u != url).toList());
+    final i = _imageUrls.indexOf(fullUrl);
+    setState(() {
+      _imageUrls = _imageUrls.where((u) => u != fullUrl).toList();
+      if (i >= 0 && i < _imageThumbUrls.length) {
+        _imageThumbUrls = List.from(_imageThumbUrls)..removeAt(i);
+      } else {
+        _imageThumbUrls = _imageThumbUrls.where((u) => u != fullUrl).toList();
+      }
+    });
     try {
       await _notesService.updateNote(widget.note!.copyWith(
         imageUrls: _imageUrls,
+        imageThumbUrls: _imageThumbUrls,
         updatedAt: DateTime.now(),
       ));
       if (mounted) _showSnackBar('Image removed');
@@ -360,7 +375,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     }
   }
 
-  Widget _buildImageTile(String url, ColorScheme colorScheme) {
+  /// fullUrl: used for download and remove. previewUrl: thumbnail for display (small size).
+  Widget _buildImageTile(String fullUrl, String previewUrl, ColorScheme colorScheme) {
+    final displayUrl = previewUrl.isNotEmpty ? previewUrl : fullUrl;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -380,7 +397,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           ),
           clipBehavior: Clip.antiAlias,
           child: image_preview.buildNoteImagePreview(
-            url: url,
+            url: displayUrl,
             width: 120,
             height: 120,
             fit: BoxFit.cover,
@@ -407,7 +424,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
             children: [
               IconButton.filled(
                 icon: const Icon(Icons.download_rounded, size: 18),
-                onPressed: () => _downloadImage(url),
+                onPressed: () => _downloadImage(fullUrl),
                 tooltip: 'Save image',
                 style: IconButton.styleFrom(
                   minimumSize: const Size(32, 32),
@@ -419,7 +436,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               if (widget.canEdit)
                 IconButton.filled(
                   icon: const Icon(Icons.close_rounded, size: 18),
-                  onPressed: () => _removeImage(url),
+                  onPressed: () => _removeImage(fullUrl),
                   tooltip: 'Remove image',
                   style: IconButton.styleFrom(
                     minimumSize: const Size(32, 32),
@@ -678,7 +695,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       Wrap(
                         spacing: 12,
                         runSpacing: 12,
-                        children: _imageUrls.map((url) => _buildImageTile(url, colorScheme)).toList(),
+                        children: List.generate(_imageUrls.length, (i) {
+                        final fullUrl = _imageUrls[i];
+                        final thumbUrl = i < _imageThumbUrls.length ? _imageThumbUrls[i] : '';
+                        return _buildImageTile(fullUrl, thumbUrl, colorScheme);
+                      }),
                       ),
                     ],
                   ],

@@ -27,6 +27,7 @@ dependencies:
   url_launcher: ^6.3.0
   shared_preferences: ^2.3.3
   image_picker: ^1.0.7
+  image: ^4.7.0
   http: ^1.2.2
   gal: ^2.3.0
 

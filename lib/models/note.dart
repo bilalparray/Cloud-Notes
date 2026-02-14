@@ -10,6 +10,8 @@ class Note {
   final String workspaceId;
   final bool isPinned;
   final List<String> imageUrls;
+  /// Thumbnail URLs for preview (same order as imageUrls). Use for display; download uses imageUrls.
+  final List<String> imageThumbUrls;
 
   Note({
     this.id,
@@ -21,8 +23,10 @@ class Note {
     required this.workspaceId,
     this.isPinned = false,
     List<String>? imageUrls,
+    List<String>? imageThumbUrls,
   })  : updatedAt = updatedAt ?? createdAt,
-        imageUrls = imageUrls ?? const [];
+        imageUrls = imageUrls ?? const [],
+        imageThumbUrls = imageThumbUrls ?? const [];
 
   factory Note.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -31,6 +35,10 @@ class Note {
     final imageUrlsRaw = data['imageUrls'];
     final imageUrls = imageUrlsRaw is List
         ? imageUrlsRaw.map((e) => e.toString()).toList()
+        : <String>[];
+    final imageThumbUrlsRaw = data['imageThumbUrls'];
+    final imageThumbUrls = imageThumbUrlsRaw is List
+        ? imageThumbUrlsRaw.map((e) => e.toString()).toList()
         : <String>[];
     return Note(
       id: doc.id,
@@ -42,6 +50,7 @@ class Note {
       workspaceId: data['workspaceId'] ?? '',
       isPinned: data['isPinned'] == true,
       imageUrls: imageUrls,
+      imageThumbUrls: imageThumbUrls,
     );
   }
 
@@ -55,6 +64,7 @@ class Note {
       'workspaceId': workspaceId,
       'isPinned': isPinned,
       'imageUrls': imageUrls,
+      'imageThumbUrls': imageThumbUrls,
     };
   }
 
@@ -68,6 +78,7 @@ class Note {
     String? workspaceId,
     bool? isPinned,
     List<String>? imageUrls,
+    List<String>? imageThumbUrls,
   }) {
     return Note(
       id: id ?? this.id,
@@ -79,6 +90,7 @@ class Note {
       workspaceId: workspaceId ?? this.workspaceId,
       isPinned: isPinned ?? this.isPinned,
       imageUrls: imageUrls ?? this.imageUrls,
+      imageThumbUrls: imageThumbUrls ?? this.imageThumbUrls,
     );
   }
 }
