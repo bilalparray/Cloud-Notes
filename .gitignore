@@ -47,8 +47,15 @@ app.*.map.json
 **/google-services.json
 **/GoogleService-Info.plist
 web/firebase-config.js
+firebase-debug.log
+firebase-debug.*.log
 .env
 .env.local
+
+# Firebase Cloud Functions
+functions/node_modules/
+functions/lib/
+npm-debug.log*
 
 # Android Keystore (DO NOT COMMIT!)
 android/keystore.jks
